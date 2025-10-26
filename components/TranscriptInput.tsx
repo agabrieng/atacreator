@@ -137,10 +137,10 @@ const TranscriptInput: React.FC<TranscriptInputProps> = ({
             onClick={handleImportClick}
             disabled={isLoading || !isMammothReady}
             title={!isMammothReady ? "Aguardando o carregamento do importador de DOCX..." : "Importar arquivo .docx"}
-            className="sm:col-span-1 col-span-2 inline-flex items-center justify-center px-4 py-2 border border-gray-300 dark:border-gray-600 text-sm font-medium rounded-md shadow-sm text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
+            className={`sm:col-span-1 col-span-2 inline-flex items-center justify-center px-4 py-2 border border-gray-300 dark:border-gray-600 text-sm font-medium rounded-md shadow-sm text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 ${!isMammothReady && !isLoading ? 'animate-pulse' : ''}`}
           >
             <UploadCloudIcon className="-ml-1 mr-2 h-5 w-5" />
-            Importar DOCX
+            {isMammothReady ? 'Importar DOCX' : 'Carregando...'}
           </button>
           <button
             onClick={onUseSample}

@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import type { MeetingMinutes } from '../types';
 import { exportToDocx, exportToPdf } from '../services/exportService';
 import { CheckIcon, ClipboardIcon, UsersIcon, TargetIcon, CheckCircleIcon, CalendarIcon, FileTextIcon, InfoIcon, DownloadIcon } from './icons';
@@ -9,6 +9,36 @@ interface MinutesDisplayProps {
 
 const MinutesDisplay: React.FC<MinutesDisplayProps> = ({ minutes }) => {
     const [copied, setCopied] = useState(false);
+    const [isDocxReady, setIsDocxReady] = useState(false);
+    const [isPdfReady, setIsPdfReady] = useState(false);
+
+    useEffect(() => {
+        const checkLibs = () => {
+            const docxReady = !!((window as any).docx && (window as any).saveAs);
+            // O plugin autotable adiciona-se ao protótipo do jsPDF
+            const pdfReady = !!((window as any).jspdf?.jsPDF?.prototype.autoTable);
+
+            if (docxReady) {
+                setIsDocxReady(true);
+            }
+            if (pdfReady) {
+                setIsPdfReady(true);
+            }
+            return docxReady && pdfReady;
+        };
+        
+        if (checkLibs()) {
+            return;
+        }
+
+        const interval = setInterval(() => {
+            if (checkLibs()) {
+                clearInterval(interval);
+            }
+        }, 200);
+
+        return () => clearInterval(interval);
+    }, []);
 
     const generatePlainText = useCallback(() => {
         if (!minutes) return '';
@@ -101,10 +131,18 @@ const MinutesDisplay: React.FC<MinutesDisplayProps> = ({ minutes }) => {
             <button onClick={handleCopy} title="Copiar para área de transferência" className="p-2 text-gray-500 hover:text-gray-800 dark:hover:text-gray-200 rounded-md bg-gray-100 dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 dark:focus:ring-offset-gray-800">
                 {copied ? <CheckIcon className="w-5 h-5 text-green-500" /> : <ClipboardIcon className="w-5 h-5" />}
             </button>
-            <button onClick={handleExportDocx} title="Exportar para DOCX" className="p-2 text-gray-500 hover:text-gray-800 dark:hover:text-gray-200 rounded-md bg-gray-100 dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 dark:focus:ring-offset-gray-800">
+            <button 
+              onClick={handleExportDocx} 
+              disabled={!isDocxReady}
+              title={isDocxReady ? "Exportar para DOCX" : "Carregando..."}
+              className={`p-2 text-gray-500 hover:text-gray-800 dark:hover:text-gray-200 rounded-md bg-gray-100 dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 dark:focus:ring-offset-gray-800 disabled:opacity-50 disabled:cursor-wait ${!isDocxReady ? 'animate-pulse' : ''}`}>
                 <DownloadIcon className="w-5 h-5" />
             </button>
-            <button onClick={handleExportPdf} title="Exportar para PDF" className="p-2 text-gray-500 hover:text-gray-800 dark:hover:text-gray-200 rounded-md bg-gray-100 dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 dark:focus:ring-offset-gray-800">
+            <button 
+              onClick={handleExportPdf}
+              disabled={!isPdfReady} 
+              title={isPdfReady ? "Exportar para PDF" : "Carregando..."}
+              className={`p-2 text-gray-500 hover:text-gray-800 dark:hover:text-gray-200 rounded-md bg-gray-100 dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 dark:focus:ring-offset-gray-800 disabled:opacity-50 disabled:cursor-wait ${!isPdfReady ? 'animate-pulse' : ''}`}>
                 <DownloadIcon className="w-5 h-5 text-red-500" />
             </button>
         </div>
