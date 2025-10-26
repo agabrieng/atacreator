@@ -2,14 +2,6 @@ import { GoogleGenAI, Type } from "@google/genai";
 import type { MeetingMinutes } from '../types';
 import { GEMINI_MODEL } from '../constants';
 
-const API_KEY = process.env.API_KEY;
-
-if (!API_KEY) {
-  throw new Error("API_KEY environment variable not set");
-}
-
-const ai = new GoogleGenAI({ apiKey: API_KEY });
-
 const responseSchema = {
     type: Type.OBJECT,
     properties: {
@@ -66,6 +58,14 @@ const responseSchema = {
 
 
 export const generateMinutesFromTranscript = async (vtt: string, title: string): Promise<MeetingMinutes> => {
+    const API_KEY = process.env.API_KEY;
+
+    if (!API_KEY) {
+      throw new Error("API_KEY_MISSING");
+    }
+
+    const ai = new GoogleGenAI({ apiKey: API_KEY });
+    
     const prompt = `
     Você é um assistente especialista em criar atas de reunião profissionais e bem estruturadas (no formato "Ata de Reunião").
     Sua tarefa é analisar a transcrição de uma reunião do Microsoft Teams, que pode ser de um arquivo VTT ou texto extraído de um DOCX, e gerar uma ata em formato JSON.
@@ -106,6 +106,6 @@ export const generateMinutesFromTranscript = async (vtt: string, title: string):
 
     } catch (error) {
         console.error("Error calling Gemini API:", error);
-        throw new Error("Failed to generate minutes from transcript.");
+        throw error;
     }
 };

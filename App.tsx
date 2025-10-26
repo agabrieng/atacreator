@@ -35,7 +35,15 @@ const App: React.FC = () => {
       setMinutes(generatedMinutes);
     } catch (err) {
       console.error(err);
-      setError('Ocorreu um erro ao gerar a ata. Verifique o console para mais detalhes e tente novamente.');
+      let errorMessage = 'Ocorreu um erro ao gerar a ata. Verifique o console para mais detalhes e tente novamente.';
+      if (err instanceof Error) {
+        if (err.message === 'API_KEY_MISSING') {
+            errorMessage = 'A chave de API não foi encontrada. Verifique se a sua chave está configurada corretamente no ambiente.';
+        } else if (err.message.includes('API key not valid')) {
+            errorMessage = 'A chave de API fornecida não é válida. Por favor, verifique a configuração e tente novamente.';
+        }
+      }
+      setError(errorMessage);
     } finally {
       setIsLoading(false);
     }
