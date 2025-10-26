@@ -23,7 +23,8 @@ export const exportToDocx = (minutes: MeetingMinutes): void => {
     return;
   }
   
-  const { Packer, Document, Paragraph, TextRun, HeadingLevel, AlignmentType } = docx;
+  const Packer = docx.Packer;
+  const { Document, Paragraph, TextRun, HeadingLevel, AlignmentType } = docx;
 
   const sections = [
     new Paragraph({
