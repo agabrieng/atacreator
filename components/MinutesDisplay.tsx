@@ -9,22 +9,19 @@ interface MinutesDisplayProps {
 
 const MinutesDisplay: React.FC<MinutesDisplayProps> = ({ minutes }) => {
     const [copied, setCopied] = useState(false);
-    const [isDocxReady, setIsDocxReady] = useState(false);
+    const [isFileSaverReady, setIsFileSaverReady] = useState(false);
     const [isPdfReady, setIsPdfReady] = useState(false);
 
     useEffect(() => {
         const checkLibs = () => {
-            const docxReady = !!((window as any).docx && (window as any).saveAs);
-            // O plugin autotable adiciona-se ao protótipo do jsPDF
-            const pdfReady = !!((window as any).jspdf?.jsPDF?.prototype.autoTable);
+            const fsReady = !!(window as any).saveAs;
+            // Check that the autotable plugin has attached itself to the jsPDF prototype
+            const pdfReady = typeof (window as any).jspdf?.jsPDF?.API?.autoTable === 'function';
 
-            if (docxReady) {
-                setIsDocxReady(true);
-            }
-            if (pdfReady) {
-                setIsPdfReady(true);
-            }
-            return docxReady && pdfReady;
+            if (fsReady) setIsFileSaverReady(true);
+            if (pdfReady) setIsPdfReady(true);
+
+            return fsReady && pdfReady;
         };
         
         if (checkLibs()) {
@@ -132,16 +129,16 @@ const MinutesDisplay: React.FC<MinutesDisplayProps> = ({ minutes }) => {
                 {copied ? <CheckIcon className="w-5 h-5 text-green-500" /> : <ClipboardIcon className="w-5 h-5" />}
             </button>
             <button 
-              onClick={handleExportDocx} 
-              disabled={!isDocxReady}
-              title={isDocxReady ? "Exportar para DOCX" : "Carregando..."}
-              className={`p-2 text-gray-500 hover:text-gray-800 dark:hover:text-gray-200 rounded-md bg-gray-100 dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 dark:focus:ring-offset-gray-800 disabled:opacity-50 disabled:cursor-wait ${!isDocxReady ? 'animate-pulse' : ''}`}>
+              onClick={handleExportDocx}
+              disabled={!isFileSaverReady} 
+              title={isFileSaverReady ? "Exportar para DOCX" : "Aguardando FileSaver.js..."}
+              className={`p-2 text-gray-500 hover:text-gray-800 dark:hover:text-gray-200 rounded-md bg-gray-100 dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 dark:focus:ring-offset-gray-800 disabled:opacity-50 disabled:cursor-wait ${!isFileSaverReady ? 'animate-pulse' : ''}`}>
                 <DownloadIcon className="w-5 h-5" />
             </button>
             <button 
               onClick={handleExportPdf}
-              disabled={!isPdfReady} 
-              title={isPdfReady ? "Exportar para PDF" : "Carregando..."}
+              disabled={!isPdfReady}
+              title={isPdfReady ? "Exportar para PDF" : "Aguardando bibliotecas de PDF..."}
               className={`p-2 text-gray-500 hover:text-gray-800 dark:hover:text-gray-200 rounded-md bg-gray-100 dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 dark:focus:ring-offset-gray-800 disabled:opacity-50 disabled:cursor-wait ${!isPdfReady ? 'animate-pulse' : ''}`}>
                 <DownloadIcon className="w-5 h-5 text-red-500" />
             </button>

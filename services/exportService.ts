@@ -1,3 +1,11 @@
+import {
+  AlignmentType,
+  Document,
+  HeadingLevel,
+  Packer,
+  Paragraph,
+  TextRun,
+} from 'docx';
 import type { MeetingMinutes } from '../types';
 
 // Helper function to create a URL/file-safe slug from the title
@@ -13,19 +21,15 @@ const slugify = (text: string): string => {
 };
 
 export const exportToDocx = (minutes: MeetingMinutes): void => {
-  const docx = (window as any).docx;
   const saveAs = (window as any).saveAs;
 
-  if (!docx || !saveAs) {
-    const errorMsg = "Uma biblioteca de exportação (docx.js ou FileSaver.js) não foi encontrada. Verifique a conexão com a internet ou se há bloqueadores de script.";
-    console.error(errorMsg, { docx, saveAs });
+  if (!saveAs) {
+    const errorMsg = "A biblioteca de exportação (FileSaver.js) não foi encontrada. Verifique a conexão com a internet ou se há bloqueadores de script.";
+    console.error(errorMsg, { saveAs });
     alert(errorMsg);
     return;
   }
   
-  const Packer = docx.Packer;
-  const { Document, Paragraph, TextRun, HeadingLevel, AlignmentType } = docx;
-
   const sections = [
     new Paragraph({
       text: minutes.cabecalho.titulo,
@@ -100,17 +104,24 @@ export const exportToDocx = (minutes: MeetingMinutes): void => {
 
 
 export const exportToPdf = (minutes: MeetingMinutes): void => {
-    const jspdf = (window as any).jspdf;
+    const jsPDF = (window as any).jspdf?.jsPDF;
 
-    if (!jspdf) {
-        const errorMsg = "A biblioteca de exportação PDF (jsPDF) não foi encontrada. Verifique a conexão com a internet ou se há bloqueadores de script.";
+    if (!jsPDF) {
+        const errorMsg = "A biblioteca de exportação (jsPDF) não foi encontrada. Verifique a conexão com a internet ou se há bloqueadores de script.";
+        console.error(errorMsg);
+        alert(errorMsg);
+        return;
+    }
+    
+    const doc = new jsPDF();
+    
+    if (typeof (doc as any).autoTable !== 'function') {
+        const errorMsg = "O plugin de exportação de tabela (jsPDF-AutoTable) não foi encontrado. Verifique a conexão com a internet ou se há bloqueadores de script.";
         console.error(errorMsg);
         alert(errorMsg);
         return;
     }
 
-    const { jsPDF } = jspdf;
-    const doc = new jsPDF();
     const page_width = doc.internal.pageSize.getWidth();
     const margin = 15;
     let cursor = 20;
