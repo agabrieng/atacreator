@@ -1,6 +1,6 @@
 
 import React, { useRef, useState, useEffect } from 'react';
-import { PlayIcon, SparklesIcon, XIcon, UploadCloudIcon, SettingsIcon, PlusIcon, TrashIcon } from './icons';
+import { SparklesIcon, XIcon, UploadCloudIcon, SettingsIcon, PlusIcon, TrashIcon } from './icons';
 import type { AdminSettings, Participant } from '../types';
 import SettingsPanel from './SettingsPanel';
 import CollapsibleSection from './CollapsibleSection';
@@ -26,7 +26,6 @@ interface InputFormProps {
   vttContent: string;
   setVttContent: (value: string) => void;
   onGenerate: () => void;
-  onUseSample: () => void;
   onClear: () => void;
   isLoading: boolean;
 }
@@ -50,7 +49,7 @@ const FormInput: React.FC<{ label: string; id: string; value: string; onChange: 
 
 
 const InputForm: React.FC<InputFormProps> = (props) => {
-  const { onGenerate, onUseSample, onClear, isLoading, participantes, setParticipantes, vttContent, setVttContent } = props;
+  const { onGenerate, onClear, isLoading, participantes, setParticipantes, vttContent, setVttContent } = props;
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isMammothReady, setIsMammothReady] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -201,17 +200,14 @@ const InputForm: React.FC<InputFormProps> = (props) => {
           <SparklesIcon className="-ml-1 mr-3 h-5 w-5" />
           {isLoading ? 'Gerando...' : 'Gerar Ata com IA'}
         </button>
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-          <button onClick={() => fileInputRef.current?.click()} disabled={isLoading || !isMammothReady} title={!isMammothReady ? "Aguardando..." : "Importar .docx"} className={`sm:col-span-1 col-span-2 inline-flex items-center justify-center px-4 py-2 border border-gray-300 dark:border-gray-600 text-sm font-medium rounded-md shadow-sm text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 disabled:opacity-50 ${!isMammothReady && !isLoading ? 'animate-pulse' : ''}`}>
+        <div className="flex gap-3">
+          <button onClick={() => fileInputRef.current?.click()} disabled={isLoading || !isMammothReady} title={!isMammothReady ? "Aguardando..." : "Importar .docx"} className={`flex-1 inline-flex items-center justify-center px-4 py-2 border border-gray-300 dark:border-gray-600 text-sm font-medium rounded-md shadow-sm text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 disabled:opacity-50 ${!isMammothReady && !isLoading ? 'animate-pulse' : ''}`}>
             <UploadCloudIcon className="-ml-1 mr-2 h-5 w-5" />
             {isMammothReady ? 'Importar DOCX' : 'Carregando...'}
           </button>
-          <button onClick={onUseSample} disabled={isLoading} className="inline-flex items-center justify-center px-4 py-2 border border-gray-300 dark:border-gray-600 text-sm font-medium rounded-md shadow-sm text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 disabled:opacity-50">
-            <PlayIcon className="-ml-1 mr-2 h-5 w-5" />
-            Exemplo
-          </button>
-          <button onClick={onClear} disabled={isLoading} title="Limpar campos" className="inline-flex items-center justify-center p-2 border border-gray-300 dark:border-gray-600 text-sm font-medium rounded-md shadow-sm text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 disabled:opacity-50">
-            <XIcon className="h-5 w-5" />
+          <button onClick={onClear} disabled={isLoading} title="Iniciar uma nova ata e limpar todos os campos" className="flex-1 inline-flex items-center justify-center px-4 py-2 border border-gray-300 dark:border-gray-600 text-sm font-medium rounded-md shadow-sm text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 disabled:opacity-50">
+            <PlusIcon className="-ml-1 mr-2 h-5 w-5" />
+            <span>Nova Ata</span>
           </button>
         </div>
       </div>

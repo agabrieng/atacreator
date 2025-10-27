@@ -4,11 +4,11 @@ import type { AtaData, AdminSettings, Participant } from './types';
 import { generateAtaData } from './services/geminiService';
 import { saveAtaToFirestore } from './services/firebaseService';
 import { exportToDocx, exportToPdf } from './services/exportService';
-import { PLACEHOLDER_VTT } from './constants';
 import Header from './components/Header';
 import InputForm from './components/InputForm';
 import MinutesDisplay from './components/MinutesDisplay';
 import Loader from './components/Loader';
+import ConfirmationDialog from './components/ConfirmationDialog';
 import { AlertTriangleIcon, EditIcon, CheckIcon, CopyIcon, UploadCloudIcon, FileWordIcon, FilePdfIcon } from './components/icons';
 
 const DEFAULT_COMPANY_NAME = "Minha Empresa";
@@ -56,6 +56,7 @@ const App: React.FC = () => {
   const [ata, setAta] = useState<AtaData | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
+  const [showClearConfirmation, setShowClearConfirmation] = useState(false);
 
   // State for the action toolbar
   const [isEditing, setIsEditing] = useState(false);
@@ -196,23 +197,6 @@ const App: React.FC = () => {
     }
   }, [vttContent, titulo, empreendimento, area, contrato, assunto, local, participantes, adminSettings]);
 
-  const handleUseSample = useCallback(() => {
-    setError(null);
-    setEmpreendimento('Obra67 - Ampliação “K” / Eletrobrás');
-    setArea('RM2 Execução de Obra');
-    setTitulo('ATA DE REUNIÃO');
-    setContrato('4500080496 - Implantação da Ampliação "K" da Subestação Gravataí 525/230 kV');
-    setAssunto('Execução de Obra');
-    setLocal('virtual Teams');
-    setParticipantes([
-        { id: '1', empresa: 'RM2', nome: 'Joacir Manoel', email: 'joacir.honorato@rm2engenharia.com.br', status: 'A' },
-        { id: '2', empresa: 'RM2', nome: 'Rodrigo Martins', email: 'rodrigo.silva@rm2engenharia.com.br', status: 'P' },
-        { id: '3', empresa: 'RM2', nome: 'Reinaldo Antônio Ferreira', email: 'reinaldo.lima@rm2engenharia.com.br', status: 'P' },
-        { id: '4', empresa: 'RM2', nome: 'Reginaldo Lafaiete', email: 'reginaldo.santos@rm2engenharia.com.br', status: 'P' },
-    ]);
-    setVttContent(PLACEHOLDER_VTT);
-  }, []);
-
   const handleClear = useCallback(() => {
     setEmpreendimento('');
     setArea('');
@@ -225,6 +209,11 @@ const App: React.FC = () => {
     setAta(null);
     setError(null);
   }, []);
+  
+  const onConfirmClear = () => {
+      handleClear();
+      setShowClearConfirmation(false);
+  };
 
   const handleSaveToCloud = useCallback(async () => {
     if (!ata) return;
@@ -270,8 +259,7 @@ const App: React.FC = () => {
             participantes={participantes} setParticipantes={setParticipantes}
             vttContent={vttContent} setVttContent={setVttContent}
             onGenerate={handleGenerate}
-            onUseSample={handleUseSample}
-            onClear={handleClear}
+            onClear={() => setShowClearConfirmation(true)}
             isLoading={isLoading}
           />
           <div className="relative lg:sticky top-8 bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 min-h-[calc(100vh-10rem)]">
@@ -339,6 +327,16 @@ const App: React.FC = () => {
           </div>
         </div>
       </main>
+      <ConfirmationDialog
+        isOpen={showClearConfirmation}
+        onClose={() => setShowClearConfirmation(false)}
+        onConfirm={onConfirmClear}
+        title="Iniciar Nova Ata"
+      >
+        Tem certeza de que deseja limpar todos os campos e começar uma nova ata? Todos os dados não salvos serão perdidos.
+        <br/><br/>
+        <strong>Dica:</strong> Salve a ata atual na nuvem antes de limpar, caso queira recuperá-la mais tarde.
+      </ConfirmationDialog>
     </div>
   );
 };
