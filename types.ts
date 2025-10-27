@@ -1,5 +1,6 @@
 
 export interface AdminSettings {
+  companyName: string;
   companyLogo: string | null; // base64 string
   docNumber: string;
   revision: string;

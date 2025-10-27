@@ -6,8 +6,9 @@ import SettingsPanel from './SettingsPanel';
 import CollapsibleSection from './CollapsibleSection';
 
 interface InputFormProps {
-  adminSettings: AdminSettings;
-  setAdminSettings: (value: AdminSettings) => void;
+  companyProfiles: Record<string, AdminSettings>;
+  currentCompanyName: string;
+  onSettingsSave: (profiles: Record<string, AdminSettings>, currentCompany: string) => void;
   empreendimento: string;
   setEmpreendimento: (value: string) => void;
   area: string;
@@ -30,7 +31,7 @@ interface InputFormProps {
   isLoading: boolean;
 }
 
-const FormInput: React.FC<{ label: string; id: string; value: string; onChange: (e: React.ChangeEvent<HTMLInputElement>) => void; placeholder?: string }> = ({ label, id, value, onChange, placeholder }) => (
+const FormInput: React.FC<{ label: string; id: string; value: string; onChange: (e: React.ChangeEvent<HTMLInputElement>) => void; placeholder?: string; onBlur?: (e: React.FocusEvent<HTMLInputElement>) => void; }> = ({ label, id, value, onChange, placeholder, onBlur }) => (
     <div>
         <label htmlFor={id} className="block text-sm font-medium text-gray-600 dark:text-gray-300">
           {label}
@@ -40,6 +41,7 @@ const FormInput: React.FC<{ label: string; id: string; value: string; onChange: 
           type="text"
           value={value}
           onChange={onChange}
+          onBlur={onBlur}
           placeholder={placeholder}
           className="mt-1 block w-full px-3 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
         />
@@ -65,6 +67,27 @@ const InputForm: React.FC<InputFormProps> = (props) => {
         return () => clearInterval(interval);
     }
   }, []);
+
+  const handleContratoBlur = (e: React.FocusEvent<HTMLInputElement>) => {
+    const contrato = e.target.value.trim();
+    if (!contrato) return;
+    try {
+      const savedHeadersStr = localStorage.getItem('ata-header-data');
+      if (savedHeadersStr) {
+        const savedHeaders = JSON.parse(savedHeadersStr);
+        const data = savedHeaders[contrato];
+        if (data) {
+          props.setEmpreendimento(data.empreendimento || '');
+          props.setArea(data.area || '');
+          props.setTitulo(data.titulo || '');
+          props.setAssunto(data.assunto || '');
+          props.setLocal(data.local || '');
+        }
+      }
+    } catch (err) {
+      console.error("Failed to load header data from localStorage", err);
+    }
+  };
 
   const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -97,7 +120,11 @@ const InputForm: React.FC<InputFormProps> = (props) => {
 
   const updateParticipant = (index: number, field: keyof Participant, value: string) => {
     const newParticipants = [...participantes];
-    (newParticipants[index] as any)[field] = value;
+    if (field === 'status') {
+        (newParticipants[index] as any)[field] = value as Participant['status'];
+    } else {
+        (newParticipants[index] as any)[field] = value;
+    }
     setParticipantes(newParticipants);
   };
   
@@ -119,7 +146,7 @@ const InputForm: React.FC<InputFormProps> = (props) => {
         <FormInput label="Empreendimento" id="empreendimento" value={props.empreendimento} onChange={(e) => props.setEmpreendimento(e.target.value)} placeholder="Nome do projeto ou obra" />
         <FormInput label="Área" id="area" value={props.area} onChange={(e) => props.setArea(e.target.value)} placeholder="Departamento ou setor responsável" />
         <FormInput label="Título do Documento" id="titulo" value={props.titulo} onChange={(e) => props.setTitulo(e.target.value)} placeholder="Ex: ATA DE REUNIÃO" />
-        <FormInput label="Contrato" id="contrato" value={props.contrato} onChange={(e) => props.setContrato(e.target.value)} placeholder="Número ou nome do contrato" />
+        <FormInput label="Contrato" id="contrato" value={props.contrato} onChange={(e) => props.setContrato(e.target.value)} placeholder="Número ou nome do contrato" onBlur={handleContratoBlur} />
         <FormInput label="Assunto" id="assunto" value={props.assunto} onChange={(e) => props.setAssunto(e.target.value)} placeholder="Assunto principal da reunião" />
         <FormInput label="Local" id="local" value={props.local} onChange={(e) => props.setLocal(e.target.value)} placeholder="Ex: Microsoft Teams, Sala de Reunião A" />
       </CollapsibleSection>
@@ -189,7 +216,7 @@ const InputForm: React.FC<InputFormProps> = (props) => {
         </div>
       </div>
       
-      {isSettingsOpen && <SettingsPanel settings={props.adminSettings} onSave={props.setAdminSettings} onClose={() => setIsSettingsOpen(false)} />}
+      {isSettingsOpen && <SettingsPanel allProfiles={props.companyProfiles} currentCompanyName={props.currentCompanyName} onSave={props.onSettingsSave} onClose={() => setIsSettingsOpen(false)} />}
     </div>
   );
 };

@@ -9,13 +9,20 @@ import MinutesDisplay from './components/MinutesDisplay';
 import Loader from './components/Loader';
 import { AlertTriangleIcon } from './components/icons';
 
-const App: React.FC = () => {
-  const [adminSettings, setAdminSettings] = useState<AdminSettings>({
+const DEFAULT_COMPANY_NAME = "Minha Empresa";
+const DEFAULT_SETTINGS: AdminSettings = {
+    companyName: DEFAULT_COMPANY_NAME,
     companyLogo: null,
     docNumber: 'FM-GCO-RM2-002',
     revision: '00',
-    propertyInfo: 'AS INFORMAÇÕES DESTE DOCUMENTO SÃO DE PROPRIEDADE DA RM2 ENGENHARIA, SENDO PROIBIDA A UTILIZAÇÃO FORA DA SUA FINALIDADE.',
-  });
+    propertyInfo: 'AS INFORMAÇÕES DESTE DOCUMENTO SÃO DE PROPRIEDADE DA SUA EMPRESA, SENDO PROIBIDA A UTILIZAÇÃO FORA DA SUA FINALIDADE.',
+};
+
+const App: React.FC = () => {
+  const [companyProfiles, setCompanyProfiles] = useState<Record<string, AdminSettings>>({});
+  const [currentCompanyName, setCurrentCompanyName] = useState<string>('');
+  
+  const adminSettings = companyProfiles[currentCompanyName] || null;
 
   const [empreendimento, setEmpreendimento] = useState('');
   const [area, setArea] = useState('');
@@ -32,19 +39,56 @@ const App: React.FC = () => {
 
   useEffect(() => {
     try {
-      const savedSettings = localStorage.getItem('ata-admin-settings');
-      if (savedSettings) {
-        setAdminSettings(JSON.parse(savedSettings));
+      const savedProfilesStr = localStorage.getItem('ata-company-profiles');
+      let profiles: Record<string, AdminSettings> = {};
+      if (savedProfilesStr) {
+        profiles = JSON.parse(savedProfilesStr);
+      }
+      
+      if (Object.keys(profiles).length === 0) {
+        profiles[DEFAULT_COMPANY_NAME] = DEFAULT_SETTINGS;
+      }
+      setCompanyProfiles(profiles);
+
+      const savedCurrentCompany = localStorage.getItem('ata-current-company-name');
+      if (savedCurrentCompany && profiles[savedCurrentCompany]) {
+        setCurrentCompanyName(savedCurrentCompany);
+      } else {
+        setCurrentCompanyName(Object.keys(profiles)[0]);
       }
     } catch (e) {
       console.error("Failed to load settings from localStorage", e);
+      setCompanyProfiles({ [DEFAULT_COMPANY_NAME]: DEFAULT_SETTINGS });
+      setCurrentCompanyName(DEFAULT_COMPANY_NAME);
     }
+  }, []);
+
+  const handleSettingsSave = useCallback((profiles: Record<string, AdminSettings>, currentCompany: string) => {
+    setCompanyProfiles(profiles);
+    setCurrentCompanyName(currentCompany);
+    localStorage.setItem('ata-company-profiles', JSON.stringify(profiles));
+    localStorage.setItem('ata-current-company-name', currentCompany);
   }, []);
 
   const handleGenerate = useCallback(async () => {
     if (!vttContent.trim() || !titulo.trim() || !empreendimento.trim()) {
       setError('Por favor, preencha o Título, Empreendimento e a Transcrição.');
       return;
+    }
+    if (!adminSettings) {
+      setError("As configurações da empresa não foram carregadas. Por favor, verifique as configurações e selecione uma empresa.");
+      return;
+    }
+    
+    if (contrato.trim()) {
+        try {
+            const savedHeadersStr = localStorage.getItem('ata-header-data') || '{}';
+            const savedHeaders = JSON.parse(savedHeadersStr);
+            savedHeaders[contrato.trim()] = { empreendimento, area, titulo, contrato, assunto, local };
+            localStorage.setItem('ata-header-data', JSON.stringify(savedHeaders));
+        } catch (e) {
+            console.error("Failed to save header data to localStorage", e);
+        }
     }
 
     setIsLoading(true);
@@ -147,8 +191,9 @@ const App: React.FC = () => {
       <main className="container mx-auto p-4 md:p-8">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
           <InputForm
-            adminSettings={adminSettings}
-            setAdminSettings={setAdminSettings}
+            companyProfiles={companyProfiles}
+            currentCompanyName={currentCompanyName}
+            onSettingsSave={handleSettingsSave}
             empreendimento={empreendimento} setEmpreendimento={setEmpreendimento}
             area={area} setArea={setArea}
             titulo={titulo} setTitulo={setTitulo}

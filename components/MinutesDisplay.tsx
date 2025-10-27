@@ -1,4 +1,5 @@
 
+
 import React, { useState, useCallback, useEffect } from 'react';
 import type { AtaData, Participant, PautaItem } from '../types';
 import { exportToDocx, exportToPdf } from '../services/exportService';
@@ -72,9 +73,6 @@ const MinutesDisplay: React.FC<MinutesDisplayProps> = ({ ata, setAta }) => {
         setAta({ ...ata, [field]: value });
     }, [ata, setAta]);
 
-    // FIX: The `status` property has a specific union type. The incoming `value` from the
-    // select input is a generic string, so it must be cast to the correct type to
-    // prevent a TypeScript error. This also uses .map() for an immutable update.
     const handleParticipantChange = useCallback((index: number, field: keyof Participant, value: string) => {
         if (!ata) return;
         const newParticipants = ata.participantes.map((p, i) => {
@@ -83,6 +81,8 @@ const MinutesDisplay: React.FC<MinutesDisplayProps> = ({ ata, setAta }) => {
             }
             const updatedParticipant = { ...p };
             if (field === 'status') {
+                // The value from a select input is a string, so we cast it to the specific
+                // union type required for the 'status' property.
                 updatedParticipant.status = value as Participant['status'];
             } else {
                 (updatedParticipant as any)[field] = value;
@@ -94,7 +94,8 @@ const MinutesDisplay: React.FC<MinutesDisplayProps> = ({ ata, setAta }) => {
     
     const addParticipant = () => {
         if (!ata) return;
-        const newParticipants = [...ata.participantes, { id: Date.now().toString(), empresa: '', nome: '', email: '', status: 'P' }];
+        // Fix: Explicitly cast status to the specific union type to prevent type widening issues.
+        const newParticipants = [...ata.participantes, { id: Date.now().toString(), empresa: '', nome: '', email: '', status: 'P' as Participant['status'] }];
         setAta({ ...ata, participantes: newParticipants });
     };
 
