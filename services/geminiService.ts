@@ -1,63 +1,58 @@
 import { GoogleGenAI, Type } from "@google/genai";
-import type { MeetingMinutes } from '../types';
+import type { PautaItem } from '../types';
 import { GEMINI_MODEL } from '../constants';
+
+interface GeminiParticipant {
+    nome: string;
+    empresa: string | null;
+}
+
+interface GeminiOutput {
+  data: string;
+  horario: string;
+  pauta: PautaItem[];
+  observacoes: string;
+  participantes: GeminiParticipant[];
+}
 
 const responseSchema = {
     type: Type.OBJECT,
     properties: {
-        cabecalho: {
-            type: Type.OBJECT,
-            properties: {
-                titulo: { type: Type.STRING, description: "O título da ata, que deve ser o título da reunião fornecido." },
-                dataHora: { type: Type.STRING, description: "A data e hora da reunião, no formato 'dd de MMMM de yyyy, HH:mm'." },
-                plataforma: { type: Type.STRING, description: "A plataforma onde a reunião ocorreu, fixo como 'Microsoft Teams'." },
-            },
-            required: ["titulo", "dataHora", "plataforma"],
-        },
+        data: { type: Type.STRING, description: "A data da reunião no formato 'DD/MM/YYYY', extraída da transcrição ou inferida a partir da data atual." },
+        horario: { type: Type.STRING, description: "A hora de início da reunião no formato 'HH:mm', extraída da transcrição ou inferida." },
         participantes: {
             type: Type.ARRAY,
-            items: { type: Type.STRING },
-            description: "Uma lista com os nomes de todos os participantes identificados na transcrição.",
-        },
-        resumo: {
-            type: Type.STRING,
-            description: "Um resumo conciso e objetivo dos principais tópicos discutidos durante a reunião.",
-        },
-        decisoes: {
-            type: Type.ARRAY,
+            description: "Lista de todos os participantes únicos identificados na transcrição pelos nomes que aparecem antes dos dois-pontos (ex: 'Nome Sobrenome:').",
             items: {
                 type: Type.OBJECT,
                 properties: {
-                    texto: { type: Type.STRING, description: "A descrição da decisão tomada." },
-                    por: { type: Type.STRING, description: "O nome da pessoa que comunicou ou validou a decisão." },
+                    nome: { type: Type.STRING, description: "O nome completo do participante, como 'Ana Silva'." },
+                    empresa: { type: Type.STRING, nullable: true, description: "A empresa do participante, se puder ser inferida da transcrição. Caso contrário, nulo." },
                 },
-                required: ["texto", "por"],
-            },
-            description: "Uma lista de todas as decisões importantes tomadas. Ex: 'Aprovado o novo design'."
+                required: ["nome"],
+            }
         },
-        acoes: {
+        pauta: {
             type: Type.ARRAY,
+            description: "A lista de itens e tópicos discutidos na reunião, seguindo a ordem da transcrição.",
             items: {
                 type: Type.OBJECT,
                 properties: {
-                    texto: { type: Type.STRING, description: "A descrição da ação ou tarefa a ser realizada." },
-                    por: { type: Type.STRING, description: "O nome do responsável pela ação." },
-                    prazo: { type: Type.STRING, description: "O prazo para a conclusão da ação, se mencionado. Caso contrário, null.", nullable: true },
+                    item: { type: Type.STRING, description: "Um número sequencial para o item da pauta. Ex: '1.', '2.'" },
+                    descricao: { type: Type.STRING, description: "Um resumo detalhado da discussão sobre o tópico, incluindo pontos importantes e decisões tomadas. Use quebras de linha para separar sub-tópicos e formatação de lista (usando 'o' ou '-') se necessário. Ex: 'Detalhamento do Cronograma:\\no A equipe solicitou detalhamento.\\no Rodrigo orientou sobre a programação.'" },
+                    responsaveis: { type: Type.ARRAY, items: { type: Type.STRING }, description: "Lista dos nomes dos responsáveis por ações ou tarefas relacionadas ao tópico." },
+                    prazo: { type: Type.STRING, nullable: true, description: "O prazo para a conclusão das ações, se houver. Ex: 'Próxima semana', '31/07/2025'." },
                 },
-                required: ["texto", "por"],
-            },
-            description: "Uma lista de itens de ação com responsáveis e prazos. Ex: 'Preparar o ambiente de produção'."
+                required: ["item", "descricao", "responsaveis"]
+            }
         },
-        encerramento: {
-            type: Type.STRING,
-            description: "Uma frase formal de encerramento da ata."
-        }
+        observacoes: { type: Type.STRING, description: "Um resumo geral conciso ou observações finais sobre a reunião. Destaque os pontos mais importantes de forma objetiva." },
     },
-    required: ["cabecalho", "participantes", "resumo", "decisoes", "acoes", "encerramento"],
+    required: ["data", "horario", "pauta", "observacoes", "participantes"],
 };
 
 
-export const generateMinutesFromTranscript = async (vtt: string, title: string): Promise<MeetingMinutes> => {
+export const generateAtaData = async (vtt: string, title: string): Promise<GeminiOutput> => {
     const API_KEY = process.env.API_KEY;
 
     if (!API_KEY) {
@@ -67,10 +62,10 @@ export const generateMinutesFromTranscript = async (vtt: string, title: string):
     const ai = new GoogleGenAI({ apiKey: API_KEY });
     
     const prompt = `
-    Você é um assistente especialista em criar atas de reunião profissionais e bem estruturadas (no formato "Ata de Reunião").
-    Sua tarefa é analisar a transcrição de uma reunião do Microsoft Teams, que pode ser de um arquivo VTT ou texto extraído de um DOCX, e gerar uma ata em formato JSON.
+    Você é um assistente especialista em criar atas de reunião profissionais no formato de documento estruturado.
+    Sua tarefa é analisar a transcrição de uma reunião e extrair as informações-chave para preencher um JSON estruturado.
 
-    **Título da Reunião:** ${title}
+    **Título da Reunião Fornecido pelo Usuário:** ${title}
     **Data e Hora da Análise:** ${new Date().toLocaleString('pt-BR')}
 
     **Transcrição:**
@@ -78,14 +73,19 @@ export const generateMinutesFromTranscript = async (vtt: string, title: string):
     ${vtt}
     \`\`\`
 
-    **Instruções:**
-    1.  **Identifique os Participantes:** Extraia os nomes de todas as pessoas que falaram na reunião. O formato comum é "Nome do Orador: Fala...".
-    2.  **Crie um Resumo:** Escreva um parágrafo resumindo os principais pontos discutidos.
-    3.  **Extraia as Decisões:** Identifique frases que indiquem uma decisão, como "fica decidido", "aprovado", "decidimos que".
-    4.  **Extraia as Ações:** Identifique tarefas delegadas a alguém, procurando por palavras como "responsável", "fica com", "vou fazer", "precisamos", e prazos como "até dia X", "na próxima semana".
-    5.  **Formate a Saída:** Retorne um objeto JSON que siga estritamente o schema fornecido. O campo 'titulo' do cabeçalho deve ser exatamente o título da reunião fornecido.
+    **Instruções Detalhadas:**
+    1.  **Participantes:** Analise a transcrição e extraia uma lista de todos os nomes únicos das pessoas que aparecem antes dos dois-pontos (ex: "Ana Silva:"). Para cada nome único, crie um objeto no array 'participantes'. Se a empresa for mencionada explicitamente na conversa, adicione-a, caso contrário, deixe o campo 'empresa' como nulo.
+    2.  **Data e Horário:** Extraia a data e o horário de início da reunião da transcrição. Se não estiver explícito, infira a partir do contexto ou use a data atual. Formate como 'DD/MM/YYYY' e 'HH:mm'.
+    3.  **Observações:** Crie um parágrafo de resumo geral (observações) que capture a essência da reunião, os principais problemas e as próximas etapas.
+    4.  **Pauta (Itens de Discussão):**
+        *   Divida a transcrição em tópicos de discussão distintos e sequenciais (ex: "Detalhamento do Cronograma", "Problemas com o Transformador", "Andamento das Atividades").
+        *   Para cada tópico, crie um objeto no array 'pauta'.
+        *   **item:** Atribua um número sequencial (Ex: "1.", "2.", "3.").
+        *   **descricao:** Descreva detalhadamente o que foi discutido no tópico. Se houver sub-pontos ou uma lista de itens, formate-os usando 'o' ou '-' no início da linha para criar uma lista dentro da string de descrição.
+        *   **responsaveis:** Liste os nomes de todas as pessoas a quem tarefas foram atribuídas nesse tópico. Se ninguém foi mencionado, retorne um array vazio.
+        *   **prazo:** Se um prazo for mencionado para as tarefas, registre-o. Caso contrário, deixe como nulo.
 
-    Gere a ata seguindo o schema JSON.
+    Seu objetivo é preencher o schema JSON da forma mais completa e precisa possível com base **exclusivamente** na transcrição fornecida.
     `;
 
     try {
@@ -95,14 +95,19 @@ export const generateMinutesFromTranscript = async (vtt: string, title: string):
             config: {
                 responseMimeType: "application/json",
                 responseSchema: responseSchema,
-                temperature: 0.2,
+                temperature: 0.1,
             }
         });
 
         const jsonText = response.text.trim();
         const parsedJson = JSON.parse(jsonText);
         
-        return parsedJson as MeetingMinutes;
+        // Ensure participants is always an array
+        if (!parsedJson.participantes) {
+            parsedJson.participantes = [];
+        }
+        
+        return parsedJson as GeminiOutput;
 
     } catch (error) {
         console.error("Error calling Gemini API:", error);

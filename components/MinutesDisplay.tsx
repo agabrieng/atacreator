@@ -1,206 +1,268 @@
+
 import React, { useState, useCallback, useEffect } from 'react';
-import type { MeetingMinutes } from '../types';
+import type { AtaData, Participant, PautaItem } from '../types';
 import { exportToDocx, exportToPdf } from '../services/exportService';
-import { CheckIcon, ClipboardIcon, UsersIcon, TargetIcon, CheckCircleIcon, CalendarIcon, FileTextIcon, InfoIcon, DownloadIcon } from './icons';
+import { CheckIcon, ClipboardIcon, FileTextIcon, DownloadIcon, EditIcon, PlusIcon, TrashIcon } from './icons';
 
 interface MinutesDisplayProps {
-  minutes: MeetingMinutes | null;
+  ata: AtaData | null;
+  setAta: (ata: AtaData | null) => void;
 }
 
-const MinutesDisplay: React.FC<MinutesDisplayProps> = ({ minutes }) => {
+const EditableInput: React.FC<{isEditing: boolean, value: string, onChange: (v:string) => void, className?: string}> = ({ isEditing, value, onChange, className }) => {
+    if (!isEditing) return <div className={`font-semibold text-sm h-6 ${className}`}>{value || ''}</div>;
+    return <input type="text" value={value} onChange={(e) => onChange(e.target.value)} className={`font-semibold text-sm h-6 w-full p-1 rounded-md bg-blue-50 dark:bg-gray-700/50 border border-blue-300 dark:border-blue-700 focus:outline-none focus:ring-1 focus:ring-blue-500 ${className}`} />;
+}
+
+const EditableTextarea: React.FC<{isEditing: boolean, value: string, onChange: (v:string) => void, className?: string}> = ({ isEditing, value, onChange, className }) => {
+    if (!isEditing) return <div className={`text-sm ${className}`}>{value}</div>;
+    return <textarea value={value} onChange={(e) => onChange(e.target.value)} rows={4} className={`text-sm w-full p-1 rounded-md bg-blue-50 dark:bg-gray-700/50 border border-blue-300 dark:border-blue-700 focus:outline-none focus:ring-1 focus:ring-blue-500 resize-y ${className}`} />;
+}
+
+const PautaDescription: React.FC<{ text: string }> = ({ text }) => {
+    const lines = text.split('\n').filter(line => line.trim() !== '');
+    return (
+        <div>
+            {lines.map((line, index) => {
+                const isListItem = /^\s*[-*o]\s/.test(line);
+                const lineContent = line.replace(/^\s*[-*o]\s/, '');
+                if (isListItem) {
+                    return <div key={index} className="ml-4 flex"><span className="mr-2">&bull;</span><span>{lineContent}</span></div>;
+                }
+                return <p key={index} className="mb-1">{line}</p>;
+            })}
+        </div>
+    );
+};
+
+const MinutesDisplay: React.FC<MinutesDisplayProps> = ({ ata, setAta }) => {
+    const [isEditing, setIsEditing] = useState(false);
     const [copied, setCopied] = useState(false);
-    const [isFileSaverReady, setIsFileSaverReady] = useState(false);
-    const [isPdfReady, setIsPdfReady] = useState(false);
+    const [isExportReady, setIsExportReady] = useState(false);
 
     useEffect(() => {
         const checkLibs = () => {
             const fsReady = !!(window as any).saveAs;
-            // Check that the autotable plugin has attached itself to the jsPDF prototype
             const pdfReady = typeof (window as any).jspdf?.jsPDF?.API?.autoTable === 'function';
-
-            if (fsReady) setIsFileSaverReady(true);
-            if (pdfReady) setIsPdfReady(true);
-
-            return fsReady && pdfReady;
+            const allReady = fsReady && pdfReady;
+            if (allReady) setIsExportReady(true);
+            return allReady;
         };
-        
-        if (checkLibs()) {
-            return;
-        }
-
-        const interval = setInterval(() => {
-            if (checkLibs()) {
-                clearInterval(interval);
-            }
-        }, 200);
-
+        if (checkLibs()) return;
+        const interval = setInterval(() => { if (checkLibs()) clearInterval(interval); }, 200);
         return () => clearInterval(interval);
     }, []);
 
     const generatePlainText = useCallback(() => {
-        if (!minutes) return '';
-        
-        let text = `ATA DE REUNIÃO\n`;
-        text += `==================================\n\n`;
-        text += `Título: ${minutes.cabecalho.titulo}\n`;
-        text += `Data/Hora: ${minutes.cabecalho.dataHora}\n`;
-        text += `Plataforma: ${minutes.cabecalho.plataforma}\n\n`;
-        
-        text += `PARTICIPANTES\n`;
-        text += `----------------------------------\n`;
-        minutes.participantes.forEach(p => text += `- ${p}\n`);
-        text += `\n`;
-
-        text += `RESUMO DA DISCUSSÃO\n`;
-        text += `----------------------------------\n`;
-        text += `${minutes.resumo}\n\n`;
-
-        text += `DECISÕES\n`;
-        text += `----------------------------------\n`;
-        if (minutes.decisoes.length > 0) {
-            minutes.decisoes.forEach(d => text += `- ${d.texto} (Por: ${d.por})\n`);
-        } else {
-            text += `Nenhuma decisão registrada.\n`;
-        }
-        text += `\n`;
-
-        text += `AÇÕES E RESPONSABILIDADES\n`;
-        text += `----------------------------------\n`;
-        if (minutes.acoes.length > 0) {
-            minutes.acoes.forEach(a => {
-                text += `- ${a.texto} (Responsável: ${a.por}${a.prazo ? `, Prazo: ${a.prazo}` : ''})\n`;
-            });
-        } else {
-            text += `Nenhuma ação registrada.\n`;
-        }
-        text += `\n`;
-        
-        text += `ENCERRAMENTO\n`;
-        text += `----------------------------------\n`;
-        text += `${minutes.encerramento}\n`;
-        
-        return text;
-    }, [minutes]);
+        if (!ata) return '';
+        return JSON.stringify(ata, null, 2);
+    }, [ata]);
 
 
     const handleCopy = useCallback(() => {
-        if (!minutes) return;
-        const textToCopy = generatePlainText();
-        navigator.clipboard.writeText(textToCopy);
+        if (!ata) return;
+        navigator.clipboard.writeText(generatePlainText());
         setCopied(true);
         setTimeout(() => setCopied(false), 2000);
-    }, [generatePlainText, minutes]);
+    }, [generatePlainText, ata]);
+    
+    // --- Edit Handlers ---
+    const handleAtaChange = useCallback(<K extends keyof AtaData>(field: K, value: AtaData[K]) => {
+        if (!ata) return;
+        setAta({ ...ata, [field]: value });
+    }, [ata, setAta]);
 
-    const handleExportDocx = useCallback(() => {
-        if (!minutes) return;
-        try {
-            exportToDocx(minutes);
-        } catch (error) {
-            console.error("Erro ao exportar para DOCX:", error);
-            alert("Ocorreu um erro ao gerar o arquivo DOCX.");
-        }
-    }, [minutes]);
+    // FIX: The `status` property has a specific union type. The incoming `value` from the
+    // select input is a generic string, so it must be cast to the correct type to
+    // prevent a TypeScript error. This also uses .map() for an immutable update.
+    const handleParticipantChange = useCallback((index: number, field: keyof Participant, value: string) => {
+        if (!ata) return;
+        const newParticipants = ata.participantes.map((p, i) => {
+            if (i !== index) {
+                return p;
+            }
+            const updatedParticipant = { ...p };
+            if (field === 'status') {
+                updatedParticipant.status = value as Participant['status'];
+            } else {
+                (updatedParticipant as any)[field] = value;
+            }
+            return updatedParticipant;
+        });
+        setAta({ ...ata, participantes: newParticipants });
+    }, [ata, setAta]);
+    
+    const addParticipant = () => {
+        if (!ata) return;
+        const newParticipants = [...ata.participantes, { id: Date.now().toString(), empresa: '', nome: '', email: '', status: 'P' }];
+        setAta({ ...ata, participantes: newParticipants });
+    };
 
-    const handleExportPdf = useCallback(() => {
-        if (!minutes) return;
-        try {
-            exportToPdf(minutes);
-        } catch (error) {
-            console.error("Erro ao exportar para PDF:", error);
-            alert("Ocorreu um erro ao gerar o arquivo PDF.");
-        }
-    }, [minutes]);
+    const removeParticipant = (id: string) => {
+        if (!ata) return;
+        setAta({ ...ata, participantes: ata.participantes.filter(p => p.id !== id) });
+    };
+
+    const handlePautaChange = useCallback((index: number, field: keyof PautaItem, value: string | string[]) => {
+        if (!ata) return;
+        const newPauta = [...ata.pauta];
+        (newPauta[index] as any)[field] = value;
+        setAta({ ...ata, pauta: newPauta });
+    }, [ata, setAta]);
+    
+    const addPautaItem = () => {
+        if (!ata) return;
+        const newItemNumber = ata.pauta.length > 0 ? `${parseInt(ata.pauta[ata.pauta.length - 1].item.replace('.', '')) + 1}.` : '1.';
+        const newPauta = [...ata.pauta, { item: newItemNumber, descricao: '', responsaveis: [], prazo: null }];
+        setAta({ ...ata, pauta: newPauta });
+    };
+
+    const removePautaItem = (index: number) => {
+        if (!ata) return;
+        const newPauta = ata.pauta.filter((_, i) => i !== index);
+        setAta({ ...ata, pauta: newPauta });
+    };
 
 
-  if (!minutes) {
+    if (!ata) {
+        return (
+          <div className="flex flex-col items-center justify-center h-full text-center text-gray-500 dark:text-gray-400">
+            <FileTextIcon className="w-20 h-20 mb-4 text-gray-300 dark:text-gray-600" />
+            <h3 className="text-xl font-semibold">Aguardando Geração da Ata</h3>
+            <p className="max-w-md mt-2">Preencha os detalhes da reunião ao lado e clique em "Gerar Ata com IA" para começar.</p>
+          </div>
+        );
+    }
+    
+    const totalPages = 1; // Placeholder
+    const commonInputClass = "p-1 rounded-md bg-blue-50 dark:bg-gray-700/50 border border-blue-300 dark:border-blue-700 focus:outline-none focus:ring-1 focus:ring-blue-500";
+
+
     return (
-      <div className="flex flex-col items-center justify-center h-full text-center text-gray-500 dark:text-gray-400">
-        <FileTextIcon className="w-20 h-20 mb-4 text-gray-300 dark:text-gray-600" />
-        <h3 className="text-xl font-semibold">Aguardando Geração da Ata</h3>
-        <p className="max-w-md mt-2">Preencha os detalhes da reunião e cole a transcrição ao lado para começar.</p>
-      </div>
-    );
-  }
-
-  return (
-    <div className="prose prose-sm sm:prose-base dark:prose-invert max-w-none relative">
-        <div className="absolute top-0 right-0 flex space-x-2">
-            <button onClick={handleCopy} title="Copiar para área de transferência" className="p-2 text-gray-500 hover:text-gray-800 dark:hover:text-gray-200 rounded-md bg-gray-100 dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 dark:focus:ring-offset-gray-800">
+    <div className={`bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 relative font-serif p-2 rounded-md ${isEditing ? 'ring-2 ring-blue-500' : ''}`}>
+        <div className="absolute top-2 right-2 flex space-x-2 z-10">
+            <button onClick={() => setIsEditing(!isEditing)} title={isEditing ? "Salvar Alterações" : "Editar Ata"} className={`p-2 rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 dark:focus:ring-offset-gray-800 ${isEditing ? 'bg-green-100 dark:bg-green-800 text-green-600 dark:text-green-300 hover:bg-green-200 focus:ring-green-500' : 'bg-gray-100 dark:bg-gray-700 text-gray-500 hover:text-gray-800 dark:hover:text-gray-200 focus:ring-blue-500'}`}>
+                {isEditing ? <CheckIcon className="w-5 h-5" /> : <EditIcon className="w-5 h-5" />}
+            </button>
+            <button onClick={handleCopy} title="Copiar Dados (JSON)" className="p-2 text-gray-500 hover:text-gray-800 dark:hover:text-gray-200 rounded-md bg-gray-100 dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 dark:focus:ring-offset-gray-800">
                 {copied ? <CheckIcon className="w-5 h-5 text-green-500" /> : <ClipboardIcon className="w-5 h-5" />}
             </button>
-            <button 
-              onClick={handleExportDocx}
-              disabled={!isFileSaverReady} 
-              title={isFileSaverReady ? "Exportar para DOCX" : "Aguardando FileSaver.js..."}
-              className={`p-2 text-gray-500 hover:text-gray-800 dark:hover:text-gray-200 rounded-md bg-gray-100 dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 dark:focus:ring-offset-gray-800 disabled:opacity-50 disabled:cursor-wait ${!isFileSaverReady ? 'animate-pulse' : ''}`}>
+            <button onClick={() => exportToDocx(ata)} disabled={!isExportReady} title={isExportReady ? "Exportar para DOCX" : "Aguardando libs..."} className={`p-2 text-gray-500 hover:text-gray-800 dark:hover:text-gray-200 rounded-md bg-gray-100 dark:bg-gray-700 disabled:opacity-50 ${!isExportReady ? 'animate-pulse' : ''}`}>
                 <DownloadIcon className="w-5 h-5" />
             </button>
-            <button 
-              onClick={handleExportPdf}
-              disabled={!isPdfReady}
-              title={isPdfReady ? "Exportar para PDF" : "Aguardando bibliotecas de PDF..."}
-              className={`p-2 text-gray-500 hover:text-gray-800 dark:hover:text-gray-200 rounded-md bg-gray-100 dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 dark:focus:ring-offset-gray-800 disabled:opacity-50 disabled:cursor-wait ${!isPdfReady ? 'animate-pulse' : ''}`}>
+            <button onClick={() => exportToPdf(ata)} disabled={!isExportReady} title={isExportReady ? "Exportar para PDF" : "Aguardando libs..."} className={`p-2 text-gray-500 hover:text-gray-800 dark:hover:text-gray-200 rounded-md bg-gray-100 dark:bg-gray-700 disabled:opacity-50 ${!isExportReady ? 'animate-pulse' : ''}`}>
                 <DownloadIcon className="w-5 h-5 text-red-500" />
             </button>
         </div>
+        
+        {isEditing && <div className="text-center text-sm font-bold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/50 p-2 rounded-t-md mb-2">Modo de Edição Ativado</div>}
 
+        {/* Header */}
+        <table className="w-full border-collapse border border-gray-400 dark:border-gray-600 mb-2">
+            <tbody>
+                <tr>
+                    <td rowSpan={3} className="border border-gray-400 dark:border-gray-600 w-1/4 text-center p-2">
+                        {ata.logoUrl ? <img src={ata.logoUrl} alt="Company Logo" className="max-h-16 mx-auto"/> : <span className="text-sm text-gray-500">Logo</span>}
+                    </td>
+                    <td rowSpan={3} className="border border-gray-400 dark:border-gray-600 text-center font-bold text-xl w-1/2">
+                        <EditableInput isEditing={isEditing} value={ata.titulo} onChange={(v) => handleAtaChange('titulo', v)} className="text-center font-bold text-xl" />
+                    </td>
+                    <td className="border border-gray-400 dark:border-gray-600 p-1 text-xs"><div className="font-bold text-gray-500 dark:text-gray-400 uppercase">N°:</div><EditableInput isEditing={isEditing} value={ata.numeroDocumento} onChange={(v) => handleAtaChange('numeroDocumento', v)} /></td>
+                    <td className="border border-gray-400 dark:border-gray-600 p-1 text-xs"><div className="font-bold text-gray-500 dark:text-gray-400 uppercase">Rev.</div><EditableInput isEditing={isEditing} value={ata.revisao} onChange={(v) => handleAtaChange('revisao', v)} /></td>
+                </tr>
+                <tr>
+                    <td colSpan={2} className="border border-gray-400 dark:border-gray-600 p-1 text-xs">
+                        <div className="font-bold text-gray-500 dark:text-gray-400 uppercase">FOLHA:</div>
+                        <div className="font-semibold text-sm h-6">{`1 de ${totalPages}`}</div>
+                    </td>
+                </tr>
+                <tr><td colSpan={2}></td></tr>
+                <tr><td className="p-1 text-xs border border-gray-400 dark:border-gray-600" colSpan={3}><div className="font-bold text-gray-500 dark:text-gray-400">EMPREENDIMENTO:</div><EditableInput isEditing={isEditing} value={ata.empreendimento} onChange={(v) => handleAtaChange('empreendimento', v)} /></td><td colSpan={1}></td></tr>
+                 <tr><td className="p-1 text-xs border border-gray-400 dark:border-gray-600" colSpan={3}><div className="font-bold text-gray-500 dark:text-gray-400">ÁREA:</div><EditableInput isEditing={isEditing} value={ata.area} onChange={(v) => handleAtaChange('area', v)} /></td><td colSpan={1}></td></tr>
+                 <tr><td className="p-1 text-xs border border-gray-400 dark:border-gray-600" colSpan={3}><div className="font-bold text-gray-500 dark:text-gray-400">TÍTULO:</div><EditableInput isEditing={isEditing} value={ata.titulo} onChange={(v) => handleAtaChange('titulo', v)} /></td><td colSpan={1}></td></tr>
+                 <tr><td className="p-1 text-xs border border-gray-400 dark:border-gray-600"><div className="font-bold text-gray-500 dark:text-gray-400">CÓPIA CONTROLADA</div></td><td colSpan={3}></td></tr>
+            </tbody>
+        </table>
 
-      <div className="text-center mb-6 border-b pb-4 dark:border-gray-600">
-        <h1 className="text-2xl font-bold mb-1">{minutes.cabecalho.titulo}</h1>
-        <p className="text-sm text-gray-500 dark:text-gray-400">
-          {minutes.cabecalho.dataHora} | {minutes.cabecalho.plataforma}
-        </p>
-      </div>
+        {/* Details */}
+        <table className="w-full border-collapse border border-gray-400 dark:border-gray-600 mb-2 text-sm">
+            <tbody>
+                <tr><td className="p-2 border-r dark:border-gray-600"><strong>Contrato:</strong> <EditableInput isEditing={isEditing} value={ata.contrato} onChange={v => handleAtaChange('contrato', v)} /></td></tr>
+                <tr><td className="p-2 border-r dark:border-gray-600"><strong>Assunto:</strong> <EditableInput isEditing={isEditing} value={ata.assunto} onChange={v => handleAtaChange('assunto', v)} /></td></tr>
+                 <tr className="border-t dark:border-gray-600">
+                    <td className="p-2 border-r dark:border-gray-600"><strong>Local:</strong> <EditableInput isEditing={isEditing} value={ata.local} onChange={v => handleAtaChange('local', v)} /></td>
+                    <td className="p-2 border-r dark:border-gray-600"><strong>Horário:</strong> <EditableInput isEditing={isEditing} value={ata.horario} onChange={v => handleAtaChange('horario', v)} /></td>
+                    <td className="p-2"><strong>Data:</strong> <EditableInput isEditing={isEditing} value={ata.data} onChange={v => handleAtaChange('data', v)} /></td>
+                </tr>
+            </tbody>
+        </table>
 
-      <section>
-        <h2 className="flex items-center text-lg font-semibold mb-3"><UsersIcon className="w-5 h-5 mr-2" />Participantes</h2>
-        <ul className="list-disc list-inside">
-          {minutes.participantes.map((p, i) => <li key={i}>{p}</li>)}
-        </ul>
-      </section>
+        {/* Participants */}
+        <table className="w-full border-collapse border border-gray-400 dark:border-gray-600 mb-2 text-sm">
+            <thead>
+                <tr className="bg-gray-100 dark:bg-gray-700">
+                    <th className="p-2 border dark:border-gray-600 font-bold">Empresa</th>
+                    <th className="p-2 border dark:border-gray-600 font-bold">Participantes</th>
+                    <th className="p-2 border dark:border-gray-600 font-bold">E-mails</th>
+                    <th className="p-2 border dark:border-gray-600 font-bold">P/A</th>
+                    <th className="p-2 border dark:border-gray-600 font-bold">Assinatura</th>
+                    {isEditing && <th className="p-2 border dark:border-gray-600 font-bold w-10"></th>}
+                </tr>
+            </thead>
+            <tbody>
+                {ata.participantes.map((p, index) => (
+                    <tr key={p.id}>
+                        <td className="p-2 border dark:border-gray-600"><EditableInput isEditing={isEditing} value={p.empresa} onChange={v => handleParticipantChange(index, 'empresa', v)} /></td>
+                        <td className="p-2 border dark:border-gray-600"><EditableInput isEditing={isEditing} value={p.nome} onChange={v => handleParticipantChange(index, 'nome', v)} /></td>
+                        <td className="p-2 border dark:border-gray-600 text-blue-500"><EditableInput isEditing={isEditing} value={p.email} onChange={v => handleParticipantChange(index, 'email', v)} /></td>
+                        <td className="p-2 border dark:border-gray-600 text-center">
+                            {isEditing ? (
+                                <select value={p.status} onChange={(e) => handleParticipantChange(index, 'status', e.target.value)} className={`w-full ${commonInputClass}`}>
+                                    <option value="P">P</option><option value="A">A</option><option value="PA">PA</option><option value="AJ">AJ</option>
+                                </select>
+                            ) : ( p.status )}
+                        </td>
+                        <td className="p-2 border dark:border-gray-600"></td>
+                        {isEditing && <td className="p-2 border dark:border-gray-600 text-center"><button onClick={() => removeParticipant(p.id)} className="text-red-500 hover:text-red-700"><TrashIcon className="w-4 h-4" /></button></td>}
+                    </tr>
+                ))}
+            </tbody>
+            <tfoot>
+                <tr className="bg-gray-100 dark:bg-gray-700"><td colSpan={isEditing ? 6: 5} className="p-2 text-xs"><strong>P</strong>=Presença <strong>PA</strong>=Presença com atraso <strong>A</strong>=Ausência <strong>AJ</strong>=Ausência Justificada</td></tr>
+            </tfoot>
+        </table>
+        {isEditing && <button onClick={addParticipant} className="flex items-center text-sm text-blue-600 dark:text-blue-400 hover:underline mb-2"><PlusIcon className="w-4 h-4 mr-1"/>Adicionar Participante</button>}
+        
+        <div className="border border-gray-400 dark:border-gray-600"><div className="text-center font-bold p-2 bg-gray-100 dark:bg-gray-700 border-b border-gray-400 dark:border-gray-600">OBSERVAÇÕES</div><div className="p-2"><EditableTextarea isEditing={isEditing} value={ata.observacoes} onChange={v => handleAtaChange('observacoes', v)} /></div></div>
+        
+        <table className="w-full border-collapse border border-gray-400 dark:border-gray-600 my-2 text-sm">
+             <thead>
+                <tr className="bg-gray-100 dark:bg-gray-700">
+                    <th className="p-2 border dark:border-gray-600 font-bold w-16">Item</th>
+                    <th className="p-2 border dark:border-gray-600 font-bold">Descrição</th>
+                    <th className="p-2 border dark:border-gray-600 font-bold w-48">Responsável(eis)</th>
+                    <th className="p-2 border dark:border-gray-600 font-bold w-32">Prazo</th>
+                    {isEditing && <th className="p-2 border dark:border-gray-600 font-bold w-10"></th>}
+                </tr>
+            </thead>
+            <tbody>
+                {ata.pauta.map((item, index) => (
+                    <tr key={index}>
+                        <td className="p-2 border dark:border-gray-600 text-center"><EditableInput isEditing={isEditing} value={item.item} onChange={v => handlePautaChange(index, 'item', v)} className="text-center font-semibold" /></td>
+                        <td className="p-2 border dark:border-gray-600">{isEditing ? <EditableTextarea isEditing={isEditing} value={item.descricao} onChange={v => handlePautaChange(index, 'descricao', v)} /> : <PautaDescription text={item.descricao} />}</td>
+                        <td className="p-2 border dark:border-gray-600"><EditableInput isEditing={isEditing} value={item.responsaveis.join(', ')} onChange={v => handlePautaChange(index, 'responsaveis', v.split(',').map(s=>s.trim()))} /></td>
+                        <td className="p-2 border dark:border-gray-600"><EditableInput isEditing={isEditing} value={item.prazo || ''} onChange={v => handlePautaChange(index, 'prazo', v)} /></td>
+                        {isEditing && <td className="p-2 border dark:border-gray-600 text-center"><button onClick={() => removePautaItem(index)} className="text-red-500 hover:text-red-700"><TrashIcon className="w-4 h-4" /></button></td>}
+                    </tr>
+                ))}
+            </tbody>
+        </table>
+         {isEditing && <button onClick={addPautaItem} className="flex items-center text-sm text-blue-600 dark:text-blue-400 hover:underline"><PlusIcon className="w-4 h-4 mr-1"/>Adicionar Item na Pauta</button>}
 
-      <section>
-        <h2 className="flex items-center text-lg font-semibold mt-6 mb-3"><InfoIcon className="w-5 h-5 mr-2" />Resumo da Discussão</h2>
-        <p>{minutes.resumo}</p>
-      </section>
-
-      <section>
-        <h2 className="flex items-center text-lg font-semibold mt-6 mb-3"><CheckCircleIcon className="w-5 h-5 mr-2" />Decisões</h2>
-        {minutes.decisoes.length > 0 ? (
-          <ul className="space-y-2">
-            {minutes.decisoes.map((d, i) => (
-              <li key={i} className="flex items-start">
-                <CheckCircleIcon className="w-4 h-4 mr-2 mt-1 text-green-500 flex-shrink-0" />
-                <span><strong>{d.por}:</strong> {d.texto}</span>
-              </li>
-            ))}
-          </ul>
-        ) : <p className="text-gray-500 italic">Nenhuma decisão registrada.</p>}
-      </section>
-      
-      <section>
-        <h2 className="flex items-center text-lg font-semibold mt-6 mb-3"><TargetIcon className="w-5 h-5 mr-2" />Ações e Responsabilidades</h2>
-        {minutes.acoes.length > 0 ? (
-          <ul className="space-y-3">
-            {minutes.acoes.map((a, i) => (
-              <li key={i} className="flex flex-col p-3 bg-gray-50 dark:bg-gray-700/50 rounded-md">
-                <div className="flex items-start font-medium">
-                  <TargetIcon className="w-4 h-4 mr-2 mt-1 text-blue-500 flex-shrink-0" />
-                  <span>{a.texto}</span>
-                </div>
-                <div className="pl-6 text-sm text-gray-600 dark:text-gray-400 mt-1">
-                  <span><strong>Responsável:</strong> {a.por}</span>
-                  {a.prazo && <span className="ml-4 flex items-center"><CalendarIcon className="w-4 h-4 mr-1"/><strong>Prazo:</strong> {a.prazo}</span>}
-                </div>
-              </li>
-            ))}
-          </ul>
-        ) : <p className="text-gray-500 italic">Nenhuma ação registrada.</p>}
-      </section>
-
-      <section className="mt-8 pt-4 border-t dark:border-gray-600">
-        <p className="text-sm text-gray-600 dark:text-gray-400 italic">{minutes.encerramento}</p>
-      </section>
+        {/* Footer */}
+        <div className="text-center text-xs text-gray-500 dark:text-gray-400 pt-4 border-t border-gray-400 dark:border-gray-600 mt-4">
+            <EditableInput isEditing={isEditing} value={ata.informacaoPropriedade} onChange={v => handleAtaChange('informacaoPropriedade', v)} className="text-center text-xs" />
+        </div>
     </div>
   );
 };

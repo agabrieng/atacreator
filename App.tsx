@@ -1,38 +1,100 @@
 
-import React, { useState, useCallback } from 'react';
-import type { MeetingMinutes } from './types';
-import { generateMinutesFromTranscript } from './services/geminiService';
+import React, { useState, useCallback, useEffect } from 'react';
+import type { AtaData, AdminSettings, Participant } from './types';
+import { generateAtaData } from './services/geminiService';
 import { PLACEHOLDER_VTT } from './constants';
 import Header from './components/Header';
-import TranscriptInput from './components/TranscriptInput';
+import InputForm from './components/InputForm';
 import MinutesDisplay from './components/MinutesDisplay';
 import Loader from './components/Loader';
 import { AlertTriangleIcon } from './components/icons';
 
 const App: React.FC = () => {
+  const [adminSettings, setAdminSettings] = useState<AdminSettings>({
+    companyLogo: null,
+    docNumber: 'FM-GCO-RM2-002',
+    revision: '00',
+    propertyInfo: 'AS INFORMAÇÕES DESTE DOCUMENTO SÃO DE PROPRIEDADE DA RM2 ENGENHARIA, SENDO PROIBIDA A UTILIZAÇÃO FORA DA SUA FINALIDADE.',
+  });
+
+  const [empreendimento, setEmpreendimento] = useState('');
+  const [area, setArea] = useState('');
+  const [titulo, setTitulo] = useState('');
+  const [contrato, setContrato] = useState('');
+  const [assunto, setAssunto] = useState('');
+  const [local, setLocal] = useState('');
+  const [participantes, setParticipantes] = useState<Participant[]>([]);
   const [vttContent, setVttContent] = useState<string>('');
-  const [meetingTitle, setMeetingTitle] = useState<string>('');
-  const [minutes, setMinutes] = useState<MeetingMinutes | null>(null);
+  
+  const [ata, setAta] = useState<AtaData | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
-  const handleGenerate = useCallback(async () => {
-    if (!vttContent.trim()) {
-      setError('Por favor, insira o conteúdo da transcrição VTT.');
-      return;
+  useEffect(() => {
+    try {
+      const savedSettings = localStorage.getItem('ata-admin-settings');
+      if (savedSettings) {
+        setAdminSettings(JSON.parse(savedSettings));
+      }
+    } catch (e) {
+      console.error("Failed to load settings from localStorage", e);
     }
-    if (!meetingTitle.trim()) {
-      setError('Por favor, insira o título da reunião.');
+  }, []);
+
+  const handleGenerate = useCallback(async () => {
+    if (!vttContent.trim() || !titulo.trim() || !empreendimento.trim()) {
+      setError('Por favor, preencha o Título, Empreendimento e a Transcrição.');
       return;
     }
 
     setIsLoading(true);
     setError(null);
-    setMinutes(null);
+    setAta(null);
 
     try {
-      const generatedMinutes = await generateMinutesFromTranscript(vttContent, meetingTitle);
-      setMinutes(generatedMinutes);
+      const generatedPart = await generateAtaData(vttContent, titulo);
+      
+      const existingParticipantNames = new Set(participantes.map(p => p.nome.toLowerCase().trim()));
+      const updatedParticipants = [...participantes];
+
+      if (generatedPart.participantes) {
+        generatedPart.participantes.forEach(geminiParticipant => {
+            const trimmedName = geminiParticipant.nome.trim();
+            if (trimmedName && !existingParticipantNames.has(trimmedName.toLowerCase())) {
+                updatedParticipants.push({
+                    id: `${Date.now()}-${trimmedName}`,
+                    nome: trimmedName,
+                    empresa: geminiParticipant.empresa || '',
+                    email: '',
+                    status: 'P',
+                });
+                existingParticipantNames.add(trimmedName.toLowerCase());
+            }
+        });
+      }
+
+      setParticipantes(updatedParticipants);
+
+      const finalAta: AtaData = {
+        logoUrl: adminSettings.companyLogo,
+        empreendimento,
+        area,
+        titulo,
+        numeroDocumento: adminSettings.docNumber,
+        revisao: adminSettings.revision,
+        contrato,
+        assunto,
+        local,
+        horario: generatedPart.horario,
+        data: generatedPart.data,
+        participantes: updatedParticipants,
+        observacoes: generatedPart.observacoes,
+        pauta: generatedPart.pauta,
+        informacaoPropriedade: adminSettings.propertyInfo,
+      };
+
+      setAta(finalAta);
+
     } catch (err) {
       console.error(err);
       let errorMessage = 'Ocorreu um erro ao gerar a ata. Verifique o console para mais detalhes e tente novamente.';
@@ -47,18 +109,35 @@ const App: React.FC = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [vttContent, meetingTitle]);
+  }, [vttContent, titulo, empreendimento, area, contrato, assunto, local, participantes, adminSettings]);
 
   const handleUseSample = useCallback(() => {
-    setVttContent(PLACEHOLDER_VTT);
-    setMeetingTitle('Reunião de Alinhamento Semanal - Projeto Phoenix');
     setError(null);
+    setEmpreendimento('Obra67 - Ampliação “K” / Eletrobrás');
+    setArea('RM2 Execução de Obra');
+    setTitulo('ATA DE REUNIÃO');
+    setContrato('4500080496 - Implantação da Ampliação "K" da Subestação Gravataí 525/230 kV');
+    setAssunto('Execução de Obra');
+    setLocal('virtual Teams');
+    setParticipantes([
+        { id: '1', empresa: 'RM2', nome: 'Joacir Manoel', email: 'joacir.honorato@rm2engenharia.com.br', status: 'A' },
+        { id: '2', empresa: 'RM2', nome: 'Rodrigo Martins', email: 'rodrigo.silva@rm2engenharia.com.br', status: 'P' },
+        { id: '3', empresa: 'RM2', nome: 'Reinaldo Antônio Ferreira', email: 'reinaldo.lima@rm2engenharia.com.br', status: 'P' },
+        { id: '4', empresa: 'RM2', nome: 'Reginaldo Lafaiete', email: 'reginaldo.santos@rm2engenharia.com.br', status: 'P' },
+    ]);
+    setVttContent(PLACEHOLDER_VTT);
   }, []);
 
   const handleClear = useCallback(() => {
+    setEmpreendimento('');
+    setArea('');
+    setTitulo('');
+    setContrato('');
+    setAssunto('');
+    setLocal('');
+    setParticipantes([]);
     setVttContent('');
-    setMeetingTitle('');
-    setMinutes(null);
+    setAta(null);
     setError(null);
   }, []);
 
@@ -67,11 +146,17 @@ const App: React.FC = () => {
       <Header />
       <main className="container mx-auto p-4 md:p-8">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
-          <TranscriptInput
-            vttContent={vttContent}
-            setVttContent={setVttContent}
-            meetingTitle={meetingTitle}
-            setMeetingTitle={setMeetingTitle}
+          <InputForm
+            adminSettings={adminSettings}
+            setAdminSettings={setAdminSettings}
+            empreendimento={empreendimento} setEmpreendimento={setEmpreendimento}
+            area={area} setArea={setArea}
+            titulo={titulo} setTitulo={setTitulo}
+            contrato={contrato} setContrato={setContrato}
+            assunto={assunto} setAssunto={setAssunto}
+            local={local} setLocal={setLocal}
+            participantes={participantes} setParticipantes={setParticipantes}
+            vttContent={vttContent} setVttContent={setVttContent}
             onGenerate={handleGenerate}
             onUseSample={handleUseSample}
             onClear={handleClear}
@@ -87,7 +172,7 @@ const App: React.FC = () => {
               </div>
             )}
             {!isLoading && !error && (
-              <MinutesDisplay minutes={minutes} />
+              <MinutesDisplay ata={ata} setAta={setAta} />
             )}
           </div>
         </div>
