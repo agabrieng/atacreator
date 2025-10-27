@@ -3,12 +3,13 @@ import React, { useState, useCallback, useEffect } from 'react';
 import type { AtaData, AdminSettings, Participant } from './types';
 import { generateAtaData } from './services/geminiService';
 import { saveAtaToFirestore } from './services/firebaseService';
+import { exportToDocx, exportToPdf } from './services/exportService';
 import { PLACEHOLDER_VTT } from './constants';
 import Header from './components/Header';
 import InputForm from './components/InputForm';
 import MinutesDisplay from './components/MinutesDisplay';
 import Loader from './components/Loader';
-import { AlertTriangleIcon } from './components/icons';
+import { AlertTriangleIcon, EditIcon, CheckIcon, CopyIcon, UploadCloudIcon, FileWordIcon, FilePdfIcon } from './components/icons';
 
 const DEFAULT_COMPANY_NAME = "Minha Empresa";
 const DEFAULT_SETTINGS: AdminSettings = {
@@ -18,6 +19,24 @@ const DEFAULT_SETTINGS: AdminSettings = {
     revision: '00',
     propertyInfo: 'AS INFORMAÇÕES DESTE DOCUMENTO SÃO DE PROPRIEDADE DA SUA EMPRESA, SENDO PROIBIDA A UTILIZAÇÃO FORA DA SUA FINALIDADE.',
 };
+
+const ActionButton: React.FC<{
+    onClick?: () => void;
+    disabled?: boolean;
+    title: string;
+    children: React.ReactNode;
+    className?: string;
+}> = ({ onClick, disabled, title, children, className }) => (
+    <button
+        onClick={onClick}
+        disabled={disabled}
+        title={title}
+        className={`inline-flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-2 dark:focus:ring-offset-gray-900 transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${className}`}
+    >
+        {children}
+    </button>
+);
+
 
 const App: React.FC = () => {
   const [companyProfiles, setCompanyProfiles] = useState<Record<string, AdminSettings>>({});
@@ -37,6 +56,13 @@ const App: React.FC = () => {
   const [ata, setAta] = useState<AtaData | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
+
+  // State for the action toolbar
+  const [isEditing, setIsEditing] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const [isExportReady, setIsExportReady] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveSuccess, setSaveSuccess] = useState(false);
 
   useEffect(() => {
     try {
@@ -63,6 +89,19 @@ const App: React.FC = () => {
       setCurrentCompanyName(DEFAULT_COMPANY_NAME);
     }
   }, []);
+  
+    useEffect(() => {
+        const checkLibs = () => {
+            const fsReady = !!(window as any).saveAs;
+            const pdfReady = typeof (window as any).jspdf?.jsPDF?.API?.autoTable === 'function';
+            const allReady = fsReady && pdfReady;
+            if (allReady) setIsExportReady(true);
+            return allReady;
+        };
+        if (checkLibs()) return;
+        const interval = setInterval(() => { if (checkLibs()) clearInterval(interval); }, 200);
+        return () => clearInterval(interval);
+    }, []);
 
   const handleSettingsSave = useCallback((profiles: Record<string, AdminSettings>, currentCompany: string) => {
     setCompanyProfiles(profiles);
@@ -95,6 +134,7 @@ const App: React.FC = () => {
     setIsLoading(true);
     setError(null);
     setAta(null);
+    setIsEditing(false); // Reset editing mode on new generation
 
     try {
       const generatedPart = await generateAtaData(vttContent, titulo);
@@ -186,19 +226,30 @@ const App: React.FC = () => {
     setError(null);
   }, []);
 
-  const handleSaveToCloud = useCallback(async (ataToSave: AtaData) => {
+  const handleSaveToCloud = useCallback(async () => {
+    if (!ata) return;
+    setIsSaving(true);
+    setSaveSuccess(false);
     try {
-      const docId = await saveAtaToFirestore(ataToSave);
-      alert(`Ata salva com sucesso na nuvem! ID: ${docId}`);
-      // Optionally update the local ata state with the new ID from firestore
+      const docId = await saveAtaToFirestore(ata);
+      // alert(`Ata salva com sucesso na nuvem! ID: ${docId}`);
       setAta(prevAta => prevAta ? { ...prevAta, id: docId } : null);
+      setSaveSuccess(true);
+      setTimeout(() => setSaveSuccess(false), 2500);
     } catch (error) {
       console.error("Erro ao salvar a ata no Firestore:", error);
       alert("Ocorreu um erro ao salvar a ata. Verifique o console para mais detalhes.");
-      // Re-throw the error if you want the calling component to handle it as well
-      throw error;
+    } finally {
+      setIsSaving(false);
     }
-  }, []);
+  }, [ata]);
+  
+  const handleCopy = useCallback(() => {
+      if (!ata) return;
+      navigator.clipboard.writeText(JSON.stringify(ata, null, 2));
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+  }, [ata]);
 
 
   return (
@@ -233,7 +284,57 @@ const App: React.FC = () => {
               </div>
             )}
             {!isLoading && !error && (
-              <MinutesDisplay ata={ata} setAta={setAta} onSaveToCloud={handleSaveToCloud} />
+              <>
+                {ata && (
+                  <div className="flex flex-wrap items-center gap-2 mb-4 pb-4 border-b border-gray-200 dark:border-gray-700">
+                     <ActionButton
+                        onClick={() => setIsEditing(!isEditing)}
+                        title={isEditing ? "Concluir Edição" : "Editar Ata"}
+                        className={isEditing ? 'bg-green-600 text-white hover:bg-green-700 focus:ring-green-500' : 'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-200 border border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600 focus:ring-blue-500'}
+                    >
+                        {isEditing ? <CheckIcon className="w-5 h-5" /> : <EditIcon className="w-5 h-5" />}
+                        <span>{isEditing ? "Concluir" : "Editar"}</span>
+                    </ActionButton>
+                    <ActionButton
+                        onClick={handleCopy}
+                        title="Copiar Dados (JSON)"
+                        className="bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-200 border border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600 focus:ring-blue-500"
+                    >
+                         {copied ? <CheckIcon className="w-5 h-5 text-green-500" /> : <CopyIcon className="w-5 h-5" />}
+                        <span>Copiar</span>
+                    </ActionButton>
+                    <ActionButton
+                        onClick={handleSaveToCloud}
+                        disabled={isSaving}
+                        title="Salvar na Nuvem"
+                        className={`bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-200 border border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600 focus:ring-blue-500 ${saveSuccess ? 'border-green-500' : ''}`}
+                    >
+                        {saveSuccess ? <CheckIcon className="w-5 h-5 text-green-500" /> : <UploadCloudIcon className="w-5 h-5" />}
+                        <span>{isSaving ? 'Salvando...' : 'Salvar'}</span>
+                    </ActionButton>
+                    <div className="flex-grow"></div>
+                    <ActionButton
+                        onClick={() => exportToDocx(ata)}
+                        disabled={!isExportReady}
+                        title={isExportReady ? "Exportar para DOCX" : "Aguardando bibliotecas de exportação..."}
+                        className="bg-blue-600 text-white hover:bg-blue-700 focus:ring-blue-500"
+                    >
+                       <FileWordIcon className="w-5 h-5" />
+                       <span>DOCX</span>
+                    </ActionButton>
+                    <ActionButton
+                        onClick={() => exportToPdf(ata)}
+                        disabled={!isExportReady}
+                        title={isExportReady ? "Exportar para PDF" : "Aguardando bibliotecas de exportação..."}
+                        className="bg-red-600 text-white hover:bg-red-700 focus:ring-red-500"
+                    >
+                       <FilePdfIcon className="w-5 h-5" />
+                       <span>PDF</span>
+                    </ActionButton>
+                  </div>
+                )}
+                <MinutesDisplay ata={ata} setAta={setAta} isEditing={isEditing} />
+              </>
             )}
           </div>
         </div>

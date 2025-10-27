@@ -217,13 +217,13 @@ export const exportToPdf = async (ata: AtaData): Promise<void> => {
         return;
     }
 
+    const totalPagesPlaceholder = '{totalPages}';
     const page_width = doc.internal.pageSize.getWidth();
     const margin = 10;
     const headerHeight = 55; // Approximate height of the header section
 
     const drawHeader = (data: any) => {
         const pageNum = data.pageNumber;
-        const totalPages = doc.internal.getNumberOfPages();
         
         // --- Header ---
         if (ata.logoUrl) {
@@ -235,7 +235,7 @@ export const exportToPdf = async (ata: AtaData): Promise<void> => {
         (doc as any).autoTable({
             head: [
                 [{ content: "ATA DE REUNIÃO", rowSpan: 3, styles: { halign: 'center', valign: 'middle', fontSize: 14, fontStyle: 'bold' } }, {content: `N°: ${ata.numeroDocumento}`, styles: {halign: 'left'}}, {content: `Rev. ${ata.revisao}`, styles: {halign: 'left'}}],
-                [{ content: `FOLHA: ${pageNum} de ${totalPages}`, colSpan: 2, styles: {halign: 'left'} }],
+                [{ content: `FOLHA: ${pageNum} de ${totalPagesPlaceholder}`, colSpan: 2, styles: {halign: 'left'} }],
                 // Empty row for spacing to match DOCX layout better
                 [{content: '', colSpan: 2, styles: {minCellHeight: 2}}] 
             ],
@@ -323,6 +323,12 @@ export const exportToPdf = async (ata: AtaData): Promise<void> => {
         doc.setPage(i);
         doc.setFontSize(8);
         doc.text(ata.informacaoPropriedade, page_width / 2, doc.internal.pageSize.getHeight() - 7, { align: 'center' });
+    }
+
+    // Replace the placeholder with the total page count.
+    // This is done after all pages are rendered.
+    if (typeof (doc as any).putTotalPages === 'function') {
+      (doc as any).putTotalPages(totalPagesPlaceholder);
     }
 
     doc.save(`${slugify(ata.titulo)}.pdf`);
