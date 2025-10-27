@@ -91,25 +91,35 @@ const InputForm: React.FC<InputFormProps> = (props) => {
   const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
-    if (!file.name.toLowerCase().endsWith('.docx')) {
-      alert('Por favor, selecione um arquivo .docx válido.');
-      if (event.target) event.target.value = '';
-      return;
+
+    const fileName = file.name.toLowerCase();
+
+    if (fileName.endsWith('.docx')) {
+      const reader = new FileReader();
+      reader.onload = async (e) => {
+        const arrayBuffer = e.target?.result as ArrayBuffer;
+        try {
+          const mammoth = (window as any).mammoth;
+          if (!mammoth) throw new Error('A biblioteca Mammoth.js não está carregada.');
+          const result = await mammoth.extractRawText({ arrayBuffer });
+          setVttContent(result.value);
+        } catch (error) {
+          console.error('Erro ao extrair texto do DOCX:', error);
+          alert('Ocorreu um erro ao processar o arquivo DOCX.');
+        }
+      };
+      reader.readAsArrayBuffer(file);
+    } else if (fileName.endsWith('.vtt')) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const textContent = e.target?.result as string;
+        setVttContent(textContent);
+      };
+      reader.readAsText(file);
+    } else {
+      alert('Por favor, selecione um arquivo .docx ou .vtt válido.');
     }
-    const reader = new FileReader();
-    reader.onload = async (e) => {
-      const arrayBuffer = e.target?.result as ArrayBuffer;
-      try {
-        const mammoth = (window as any).mammoth;
-        if (!mammoth) throw new Error('A biblioteca Mammoth.js não está carregada.');
-        const result = await mammoth.extractRawText({ arrayBuffer });
-        setVttContent(result.value);
-      } catch (error) {
-        console.error('Erro ao extrair texto do DOCX:', error);
-        alert('Ocorreu um erro ao processar o arquivo DOCX.');
-      }
-    };
-    reader.readAsArrayBuffer(file);
+    
     if (event.target) event.target.value = '';
   };
 
@@ -180,7 +190,7 @@ const InputForm: React.FC<InputFormProps> = (props) => {
 
       <CollapsibleSection title="3. Transcrição da Reunião" defaultOpen={true}>
         <p className="text-sm text-gray-500 dark:text-gray-400">
-          Cole o conteúdo da transcrição ou importe um arquivo DOCX.
+          Cole o conteúdo da transcrição ou importe um arquivo DOCX ou VTT.
         </p>
         <textarea
           value={vttContent}
@@ -188,7 +198,7 @@ const InputForm: React.FC<InputFormProps> = (props) => {
           placeholder="Cole a transcrição ou use o botão de importação..."
           className="w-full h-48 p-3 font-mono text-sm bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-blue-500 focus:border-blue-500 resize-y"
         />
-        <input type="file" ref={fileInputRef} onChange={handleFileChange} accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document" className="hidden" aria-hidden="true" />
+        <input type="file" ref={fileInputRef} onChange={handleFileChange} accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document,.vtt,text/vtt" className="hidden" aria-hidden="true" />
       </CollapsibleSection>
 
       <div className="space-y-3 pt-4 border-t dark:border-gray-700">
@@ -201,9 +211,9 @@ const InputForm: React.FC<InputFormProps> = (props) => {
           {isLoading ? 'Gerando...' : 'Gerar Ata com IA'}
         </button>
         <div className="flex gap-3">
-          <button onClick={() => fileInputRef.current?.click()} disabled={isLoading || !isMammothReady} title={!isMammothReady ? "Aguardando..." : "Importar .docx"} className={`flex-1 inline-flex items-center justify-center px-4 py-2 border border-gray-300 dark:border-gray-600 text-sm font-medium rounded-md shadow-sm text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 disabled:opacity-50 ${!isMammothReady && !isLoading ? 'animate-pulse' : ''}`}>
+          <button onClick={() => fileInputRef.current?.click()} disabled={isLoading || !isMammothReady} title={!isMammothReady ? "Aguardando..." : "Importar arquivo .docx ou .vtt"} className={`flex-1 inline-flex items-center justify-center px-4 py-2 border border-gray-300 dark:border-gray-600 text-sm font-medium rounded-md shadow-sm text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 disabled:opacity-50 ${!isMammothReady && !isLoading ? 'animate-pulse' : ''}`}>
             <UploadCloudIcon className="-ml-1 mr-2 h-5 w-5" />
-            {isMammothReady ? 'Importar DOCX' : 'Carregando...'}
+            {isMammothReady ? 'Importar Arquivo' : 'Carregando...'}
           </button>
           <button onClick={onClear} disabled={isLoading} title="Iniciar uma nova ata e limpar todos os campos" className="flex-1 inline-flex items-center justify-center px-4 py-2 border border-gray-300 dark:border-gray-600 text-sm font-medium rounded-md shadow-sm text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 disabled:opacity-50">
             <PlusIcon className="-ml-1 mr-2 h-5 w-5" />
