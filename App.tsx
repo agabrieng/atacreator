@@ -2,6 +2,7 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import type { AtaData, AdminSettings, Participant } from './types';
 import { generateAtaData } from './services/geminiService';
+import { saveAtaToFirestore } from './services/firebaseService';
 import { PLACEHOLDER_VTT } from './constants';
 import Header from './components/Header';
 import InputForm from './components/InputForm';
@@ -185,6 +186,21 @@ const App: React.FC = () => {
     setError(null);
   }, []);
 
+  const handleSaveToCloud = useCallback(async (ataToSave: AtaData) => {
+    try {
+      const docId = await saveAtaToFirestore(ataToSave);
+      alert(`Ata salva com sucesso na nuvem! ID: ${docId}`);
+      // Optionally update the local ata state with the new ID from firestore
+      setAta(prevAta => prevAta ? { ...prevAta, id: docId } : null);
+    } catch (error) {
+      console.error("Erro ao salvar a ata no Firestore:", error);
+      alert("Ocorreu um erro ao salvar a ata. Verifique o console para mais detalhes.");
+      // Re-throw the error if you want the calling component to handle it as well
+      throw error;
+    }
+  }, []);
+
+
   return (
     <div className="min-h-screen bg-gray-50 text-gray-800 dark:bg-gray-900 dark:text-gray-200 font-sans">
       <Header />
@@ -217,7 +233,7 @@ const App: React.FC = () => {
               </div>
             )}
             {!isLoading && !error && (
-              <MinutesDisplay ata={ata} setAta={setAta} />
+              <MinutesDisplay ata={ata} setAta={setAta} onSaveToCloud={handleSaveToCloud} />
             )}
           </div>
         </div>

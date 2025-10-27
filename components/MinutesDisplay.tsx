@@ -3,11 +3,12 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import type { AtaData, Participant, PautaItem } from '../types';
 import { exportToDocx, exportToPdf } from '../services/exportService';
-import { CheckIcon, ClipboardIcon, FileTextIcon, DownloadIcon, EditIcon, PlusIcon, TrashIcon } from './icons';
+import { CheckIcon, ClipboardIcon, FileTextIcon, DownloadIcon, EditIcon, PlusIcon, TrashIcon, UploadCloudIcon } from './icons';
 
 interface MinutesDisplayProps {
   ata: AtaData | null;
   setAta: (ata: AtaData | null) => void;
+  onSaveToCloud: (ata: AtaData) => Promise<void>;
 }
 
 const EditableInput: React.FC<{isEditing: boolean, value: string, onChange: (v:string) => void, className?: string}> = ({ isEditing, value, onChange, className }) => {
@@ -36,10 +37,12 @@ const PautaDescription: React.FC<{ text: string }> = ({ text }) => {
     );
 };
 
-const MinutesDisplay: React.FC<MinutesDisplayProps> = ({ ata, setAta }) => {
+const MinutesDisplay: React.FC<MinutesDisplayProps> = ({ ata, setAta, onSaveToCloud }) => {
     const [isEditing, setIsEditing] = useState(false);
     const [copied, setCopied] = useState(false);
     const [isExportReady, setIsExportReady] = useState(false);
+    const [isSaving, setIsSaving] = useState(false);
+    const [saveSuccess, setSaveSuccess] = useState(false);
 
     useEffect(() => {
         const checkLibs = () => {
@@ -66,6 +69,21 @@ const MinutesDisplay: React.FC<MinutesDisplayProps> = ({ ata, setAta }) => {
         setCopied(true);
         setTimeout(() => setCopied(false), 2000);
     }, [generatePlainText, ata]);
+
+    const handleSaveToCloud = async () => {
+        if (!ata) return;
+        setIsSaving(true);
+        setSaveSuccess(false);
+        try {
+            await onSaveToCloud(ata);
+            setSaveSuccess(true);
+            setTimeout(() => setSaveSuccess(false), 2500);
+        } catch (error) {
+            // Error is alerted in the parent component
+        } finally {
+            setIsSaving(false);
+        }
+    };
     
     // --- Edit Handlers ---
     const handleAtaChange = useCallback(<K extends keyof AtaData>(field: K, value: AtaData[K]) => {
@@ -141,12 +159,15 @@ const MinutesDisplay: React.FC<MinutesDisplayProps> = ({ ata, setAta }) => {
 
     return (
     <div className={`bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 relative font-serif p-2 rounded-md ${isEditing ? 'ring-2 ring-blue-500' : ''}`}>
-        <div className="absolute top-2 right-2 flex space-x-2 z-10">
+        <div className="absolute top-2 right-2 flex flex-wrap justify-end gap-2 z-10">
             <button onClick={() => setIsEditing(!isEditing)} title={isEditing ? "Salvar Alterações" : "Editar Ata"} className={`p-2 rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 dark:focus:ring-offset-gray-800 ${isEditing ? 'bg-green-100 dark:bg-green-800 text-green-600 dark:text-green-300 hover:bg-green-200 focus:ring-green-500' : 'bg-gray-100 dark:bg-gray-700 text-gray-500 hover:text-gray-800 dark:hover:text-gray-200 focus:ring-blue-500'}`}>
                 {isEditing ? <CheckIcon className="w-5 h-5" /> : <EditIcon className="w-5 h-5" />}
             </button>
             <button onClick={handleCopy} title="Copiar Dados (JSON)" className="p-2 text-gray-500 hover:text-gray-800 dark:hover:text-gray-200 rounded-md bg-gray-100 dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 dark:focus:ring-offset-gray-800">
                 {copied ? <CheckIcon className="w-5 h-5 text-green-500" /> : <ClipboardIcon className="w-5 h-5" />}
+            </button>
+             <button onClick={handleSaveToCloud} disabled={isSaving} title="Salvar na Nuvem" className={`p-2 rounded-md bg-gray-100 dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 dark:focus:ring-offset-gray-800 disabled:opacity-50 disabled:cursor-wait ${saveSuccess ? 'text-green-500' : 'text-gray-500 hover:text-gray-800 dark:hover:text-gray-200'}`}>
+                {saveSuccess ? <CheckIcon className="w-5 h-5" /> : <UploadCloudIcon className="w-5 h-5" />}
             </button>
             <button onClick={() => exportToDocx(ata)} disabled={!isExportReady} title={isExportReady ? "Exportar para DOCX" : "Aguardando libs..."} className={`p-2 text-gray-500 hover:text-gray-800 dark:hover:text-gray-200 rounded-md bg-gray-100 dark:bg-gray-700 disabled:opacity-50 ${!isExportReady ? 'animate-pulse' : ''}`}>
                 <DownloadIcon className="w-5 h-5" />
@@ -156,7 +177,7 @@ const MinutesDisplay: React.FC<MinutesDisplayProps> = ({ ata, setAta }) => {
             </button>
         </div>
         
-        {isEditing && <div className="text-center text-sm font-bold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/50 p-2 rounded-t-md mb-2">Modo de Edição Ativado</div>}
+        {isEditing && <div className="text-center text-sm font-bold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/50 p-2 rounded-t-md mb-2 mt-14">Modo de Edição Ativado</div>}
 
         {/* Header */}
         <table className="w-full border-collapse border border-gray-400 dark:border-gray-600 mb-2">

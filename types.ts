@@ -24,6 +24,7 @@ export interface PautaItem {
 
 // This represents the complete data for the final document
 export interface AtaData {
+  id?: string; // Firestore document ID
   // Header part 1
   logoUrl: string | null;
   empreendimento: string;
