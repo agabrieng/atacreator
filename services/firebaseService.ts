@@ -35,6 +35,15 @@ export const saveAtaToFirestore = async (ataData: AtaData): Promise<string> => {
     try {
         // We remove the ID before saving to avoid storing it redundantly inside the document
         const { id, ...dataToSave } = ataData;
+        
+        // Clean up the pauta items to ensure they match the new data structure
+        if (dataToSave.pauta) {
+            dataToSave.pauta = dataToSave.pauta.map(item => {
+                const { prazo, ...restOfItem } = item; // Remove the top-level 'prazo'
+                return restOfItem;
+            });
+        }
+
         const docRef = await atasCollectionRef.add(dataToSave);
         console.log("Document written with ID: ", docRef.id);
         return docRef.id;
@@ -53,9 +62,23 @@ export const loadAtasFromFirestore = async (): Promise<AtaData[]> => {
         const querySnapshot = await atasCollectionRef.get();
         const atas: AtaData[] = [];
         querySnapshot.forEach((doc) => {
+            const data = doc.data() as any; // Cast to any to handle migration
+
+            // On-the-fly migration for old data structure
+            if (data.pauta && data.pauta.length > 0 && data.pauta[0].responsaveis && typeof data.pauta[0].responsaveis[0] === 'string') {
+                data.pauta = data.pauta.map((item: any) => ({
+                    ...item,
+                    responsaveis: item.responsaveis.map((resp: string) => ({
+                        id: `${Date.now()}-${Math.random()}-${resp}`,
+                        responsavel: resp,
+                        prazo: item.prazo || null // Assign the single prazo to each responsible
+                    }))
+                }));
+            }
+
             atas.push({
                 id: doc.id,
-                ...(doc.data() as Omit<AtaData, 'id'>)
+                ...(data as Omit<AtaData, 'id'>)
             });
         });
         return atas;

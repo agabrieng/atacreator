@@ -28,6 +28,7 @@ interface InputFormProps {
   onGenerate: () => void;
   onClear: () => void;
   isLoading: boolean;
+  isEditing: boolean;
 }
 
 const FormInput: React.FC<{ label: string; id: string; value: string; onChange: (e: React.ChangeEvent<HTMLInputElement>) => void; placeholder?: string; onBlur?: (e: React.FocusEvent<HTMLInputElement>) => void; }> = ({ label, id, value, onChange, placeholder, onBlur }) => (
@@ -49,7 +50,7 @@ const FormInput: React.FC<{ label: string; id: string; value: string; onChange: 
 
 
 const InputForm: React.FC<InputFormProps> = (props) => {
-  const { onGenerate, onClear, isLoading, participantes, setParticipantes, vttContent, setVttContent } = props;
+  const { onGenerate, onClear, isLoading, isEditing, participantes, setParticipantes, vttContent, setVttContent } = props;
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isMammothReady, setIsMammothReady] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -204,7 +205,8 @@ const InputForm: React.FC<InputFormProps> = (props) => {
       <div className="space-y-3 pt-4 border-t dark:border-gray-700">
         <button
           onClick={onGenerate}
-          disabled={isLoading}
+          disabled={isLoading || isEditing}
+          title={isEditing ? "Conclua a edição para gerar uma nova ata." : "Gerar Ata com IA"}
           className="w-full inline-flex items-center justify-center px-4 py-3 border border-transparent text-base font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:bg-blue-300 disabled:cursor-not-allowed dark:focus:ring-offset-gray-800"
         >
           <SparklesIcon className="-ml-1 mr-3 h-5 w-5" />

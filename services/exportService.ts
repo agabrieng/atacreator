@@ -3,9 +3,26 @@
 import {
   AlignmentType, Document, Packer, Paragraph, Table, TableCell, TableRow, WidthType, VerticalAlign, HeadingLevel, TextRun, ImageRun, Header, PageNumber
 } from 'docx';
-import type { AtaData } from '../types';
+import type { AtaData, ResponsavelPrazo } from '../types';
 
 const slugify = (text: string): string => text.toString().toLowerCase().trim().replace(/\s+/g, '-').replace(/[^\w-]+/g, '').substring(0, 50);
+
+const shortenName = (fullName: string): string => {
+  if (!fullName) return '';
+  const parts = fullName.trim().split(/\s+/);
+  return parts.slice(0, 2).join(' ');
+};
+
+
+// Colors mapped from TailwindCSS classes in MinutesDisplay.tsx for PDF generation
+const PDF_COLORS = [
+    { bg: [219, 234, 254], text: [30, 64, 175] },    // Blue
+    { bg: [209, 250, 229], text: [6, 95, 70] },      // Green
+    { bg: [254, 249, 195], text: [133, 77, 14] },    // Yellow
+    { bg: [243, 232, 255], text: [88, 28, 135] },    // Purple
+    { bg: [252, 231, 243], text: [157, 23, 77] },    // Pink
+];
+
 
 export const exportToDocx = async (ata: AtaData): Promise<void> => {
     const saveAs = (window as any).saveAs;
@@ -161,10 +178,10 @@ export const exportToDocx = async (ata: AtaData): Promise<void> => {
                         }),
                         ...ata.pauta.map(item => new TableRow({
                             children: [
-                                new TableCell({ children: [new Paragraph(item.item)], verticalAlign: VerticalAlign.CENTER }),
+                                new TableCell({ children: [new Paragraph(item.item)], verticalAlign: VerticalAlign.TOP }),
                                 new TableCell({ children: item.descricao.split('\n').map(line => new Paragraph(line))}),
-                                new TableCell({ children: [new Paragraph(item.responsaveis.join(', '))], verticalAlign: VerticalAlign.CENTER }),
-                                new TableCell({ children: [new Paragraph(item.prazo || "")], verticalAlign: VerticalAlign.CENTER }),
+                                new TableCell({ children: item.responsaveis.map(r => new Paragraph(shortenName(r.responsavel))), verticalAlign: VerticalAlign.TOP }),
+                                new TableCell({ children: item.responsaveis.map(r => new Paragraph(r.prazo || "")), verticalAlign: VerticalAlign.TOP }),
                             ]
                         }))
                     ]
@@ -300,19 +317,53 @@ export const exportToPdf = async (ata: AtaData): Promise<void> => {
     });
 
     // --- Pauta ---
+    const pautaBody: any[] = [];
+    ata.pauta.forEach(item => {
+        const numResponsaveis = item.responsaveis.length;
+        if (numResponsaveis === 0) {
+            pautaBody.push([
+                { content: item.item, styles: { halign: 'center', valign: 'middle' } },
+                item.descricao,
+                '',
+                ''
+            ]);
+        } else {
+            item.responsaveis.forEach((resp, respIndex) => {
+                const color = PDF_COLORS[respIndex % PDF_COLORS.length];
+                const cellStyles = {
+                    fillColor: color.bg,
+                    textColor: color.text,
+                    fontStyle: 'normal',
+                    halign: 'left',
+                    valign: 'middle',
+                };
+
+                const responsavelCell = { content: shortenName(resp.responsavel), styles: cellStyles };
+                const prazoCell = { content: resp.prazo || 'N/A', styles: cellStyles };
+
+                if (respIndex === 0) {
+                    pautaBody.push([
+                        { content: item.item, rowSpan: numResponsaveis, styles: { halign: 'center', valign: 'top' } },
+                        { content: item.descricao, rowSpan: numResponsaveis, styles: { valign: 'top' } },
+                        responsavelCell,
+                        prazoCell
+                    ]);
+                } else {
+                    pautaBody.push([responsavelCell, prazoCell]);
+                }
+            });
+        }
+    });
+
     (doc as any).autoTable({
         head: [['Item', 'Descrição', 'Responsável(eis)', 'Prazo']],
-        body: ata.pauta.map(p => [
-            {content: p.item, styles: {halign: 'center'}},
-            p.descricao,
-            p.responsaveis.join(', '),
-            p.prazo || ''
-        ]),
+        body: pautaBody,
         startY: (doc as any).autoTable.previous.finalY + 2,
         ...autoTableConfig,
         columnStyles: {
             0: { cellWidth: 15 },
-            2: { cellWidth: 40 },
+            1: { cellWidth: 'auto' },
+            2: { cellWidth: 45 },
             3: { cellWidth: 30 },
         }
     });

@@ -15,11 +15,17 @@ export interface Participant {
   status: 'P' | 'A' | 'PA' | 'AJ';
 }
 
+export interface ResponsavelPrazo {
+    id: string; // for React keys
+    responsavel: string;
+    prazo: string | null;
+}
+
 export interface PautaItem {
   item: string; // e.g., "1."
   descricao: string;
-  responsaveis: string[];
-  prazo: string | null;
+  responsaveis: ResponsavelPrazo[];
+  prazo?: string | null; // Kept for migrating old data from gemini/firestore
 }
 
 // This represents the complete data for the final document

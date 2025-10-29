@@ -1,15 +1,17 @@
 
+
 import React, { useState, useCallback, useEffect } from 'react';
-import type { AtaData, AdminSettings, Participant } from './types';
+import type { AtaData, AdminSettings, Participant, PautaItem } from './types';
 import { generateAtaData } from './services/geminiService';
-import { saveAtaToFirestore } from './services/firebaseService';
+import { saveAtaToFirestore, loadAtasFromFirestore } from './services/firebaseService';
 import { exportToDocx, exportToPdf } from './services/exportService';
 import Header from './components/Header';
 import InputForm from './components/InputForm';
 import MinutesDisplay from './components/MinutesDisplay';
 import Loader from './components/Loader';
 import ConfirmationDialog from './components/ConfirmationDialog';
-import { AlertTriangleIcon, EditIcon, CheckIcon, CopyIcon, UploadCloudIcon, FileWordIcon, FilePdfIcon } from './components/icons';
+import SavedAtasPanel from './components/SavedAtasPanel';
+import { AlertTriangleIcon, EditIcon, CheckIcon, CopyIcon, UploadCloudIcon, DownloadCloudIcon, FileWordIcon, FilePdfIcon } from './components/icons';
 
 const DEFAULT_COMPANY_NAME = "Minha Empresa";
 const DEFAULT_SETTINGS: AdminSettings = {
@@ -57,6 +59,8 @@ const App: React.FC = () => {
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [showClearConfirmation, setShowClearConfirmation] = useState(false);
+  const [showOverwriteConfirmation, setShowOverwriteConfirmation] = useState(false);
+
 
   // State for the action toolbar
   const [isEditing, setIsEditing] = useState(false);
@@ -64,6 +68,13 @@ const App: React.FC = () => {
   const [isExportReady, setIsExportReady] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
+  
+  // State for loading saved atas
+  const [savedAtas, setSavedAtas] = useState<AtaData[]>([]);
+  const [isSavedAtasLoading, setIsSavedAtasLoading] = useState(false);
+  const [showLoadPanel, setShowLoadPanel] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
+
 
   useEffect(() => {
     try {
@@ -161,6 +172,17 @@ const App: React.FC = () => {
 
       setParticipantes(updatedParticipants);
 
+      // Transform the pauta from Gemini's output to the application's data structure
+      const finalPauta: PautaItem[] = generatedPart.pauta.map(item => ({
+          item: item.item,
+          descricao: item.descricao,
+          responsaveis: item.responsaveis.map(resp => ({
+              id: `${Date.now()}-${Math.random()}-${resp}`,
+              responsavel: resp,
+              prazo: item.prazo, // Assign the common deadline to each responsible
+          }))
+      }));
+
       const finalAta: AtaData = {
         logoUrl: adminSettings.companyLogo,
         empreendimento,
@@ -175,7 +197,7 @@ const App: React.FC = () => {
         data: generatedPart.data,
         participantes: updatedParticipants,
         observacoes: generatedPart.observacoes,
-        pauta: generatedPart.pauta,
+        pauta: finalPauta,
         informacaoPropriedade: adminSettings.propertyInfo,
       };
 
@@ -186,9 +208,9 @@ const App: React.FC = () => {
       let errorMessage = 'Ocorreu um erro ao gerar a ata. Verifique o console para mais detalhes e tente novamente.';
       if (err instanceof Error) {
         if (err.message === 'API_KEY_MISSING') {
-            errorMessage = 'A chave de API não foi encontrada. Verifique se a sua chave está configurada corretamente no ambiente.';
+            errorMessage = 'A chave de API não foi encontrada. Verifique se a variável de ambiente API_KEY está configurada no seu ambiente de produção.';
         } else if (err.message.includes('API key not valid')) {
-            errorMessage = 'A chave de API fornecida não é válida. Por favor, verifique a configuração e tente novamente.';
+            errorMessage = 'A chave de API fornecida não é válida. Por favor, verifique a variável de ambiente API_KEY nas configurações de implantação do seu serviço e tente novamente.';
         }
       }
       setError(errorMessage);
@@ -196,6 +218,19 @@ const App: React.FC = () => {
       setIsLoading(false);
     }
   }, [vttContent, titulo, empreendimento, area, contrato, assunto, local, participantes, adminSettings]);
+  
+  const handleGenerateClick = () => {
+    if (ata) {
+      setShowOverwriteConfirmation(true);
+    } else {
+      handleGenerate();
+    }
+  };
+
+  const onConfirmOverwrite = () => {
+      handleGenerate();
+      setShowOverwriteConfirmation(false);
+  };
 
   const handleClear = useCallback(() => {
     setEmpreendimento('');
@@ -208,6 +243,7 @@ const App: React.FC = () => {
     setVttContent('');
     setAta(null);
     setError(null);
+    setIsEditing(false); // Reset editing state
   }, []);
   
   const onConfirmClear = () => {
@@ -221,7 +257,6 @@ const App: React.FC = () => {
     setSaveSuccess(false);
     try {
       const docId = await saveAtaToFirestore(ata);
-      // alert(`Ata salva com sucesso na nuvem! ID: ${docId}`);
       setAta(prevAta => prevAta ? { ...prevAta, id: docId } : null);
       setSaveSuccess(true);
       setTimeout(() => setSaveSuccess(false), 2500);
@@ -232,6 +267,39 @@ const App: React.FC = () => {
       setIsSaving(false);
     }
   }, [ata]);
+  
+  const handleOpenLoadPanel = useCallback(async () => {
+    setShowLoadPanel(true);
+    setIsSavedAtasLoading(true);
+    setLoadError(null);
+    try {
+        const loadedAtas = await loadAtasFromFirestore();
+        loadedAtas.sort((a, b) => {
+            const dateA = a.data.split('/').reverse().join('');
+            const dateB = b.data.split('/').reverse().join('');
+            return dateB.localeCompare(dateA);
+        });
+        setSavedAtas(loadedAtas);
+    } catch (error) {
+        console.error("Failed to load atas from Firestore:", error);
+        setLoadError("Não foi possível carregar as atas. Verifique sua conexão e a configuração do Firestore.");
+    } finally {
+        setIsSavedAtasLoading(false);
+    }
+  }, []);
+
+  const handleSelectSavedAta = useCallback((selectedAta: AtaData) => {
+    setAta(selectedAta);
+    setEmpreendimento(selectedAta.empreendimento || '');
+    setArea(selectedAta.area || '');
+    setTitulo(selectedAta.titulo || '');
+    setContrato(selectedAta.contrato || '');
+    setAssunto(selectedAta.assunto || '');
+    setLocal(selectedAta.local || '');
+    setParticipantes(selectedAta.participantes || []);
+    setVttContent('');
+    setShowLoadPanel(false);
+  }, []);
   
   const handleCopy = useCallback(() => {
       if (!ata) return;
@@ -258,9 +326,10 @@ const App: React.FC = () => {
             local={local} setLocal={setLocal}
             participantes={participantes} setParticipantes={setParticipantes}
             vttContent={vttContent} setVttContent={setVttContent}
-            onGenerate={handleGenerate}
+            onGenerate={handleGenerateClick}
             onClear={() => setShowClearConfirmation(true)}
             isLoading={isLoading}
+            isEditing={isEditing}
           />
           <div className="relative lg:sticky top-8 bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 min-h-[calc(100vh-10rem)]">
             {isLoading && <Loader />}
@@ -285,7 +354,8 @@ const App: React.FC = () => {
                     </ActionButton>
                     <ActionButton
                         onClick={handleCopy}
-                        title="Copiar Dados (JSON)"
+                        disabled={isEditing}
+                        title={isEditing ? "Conclua a edição para poder copiar" : "Copiar Dados (JSON)"}
                         className="bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-200 border border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600 focus:ring-blue-500"
                     >
                          {copied ? <CheckIcon className="w-5 h-5 text-green-500" /> : <CopyIcon className="w-5 h-5" />}
@@ -293,18 +363,27 @@ const App: React.FC = () => {
                     </ActionButton>
                     <ActionButton
                         onClick={handleSaveToCloud}
-                        disabled={isSaving}
-                        title="Salvar na Nuvem"
+                        disabled={isEditing || isSaving}
+                        title={isEditing ? "Conclua a edição para poder salvar" : "Salvar na Nuvem"}
                         className={`bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-200 border border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600 focus:ring-blue-500 ${saveSuccess ? 'border-green-500' : ''}`}
                     >
                         {saveSuccess ? <CheckIcon className="w-5 h-5 text-green-500" /> : <UploadCloudIcon className="w-5 h-5" />}
                         <span>{isSaving ? 'Salvando...' : 'Salvar'}</span>
                     </ActionButton>
+                    <ActionButton
+                        onClick={handleOpenLoadPanel}
+                        disabled={isEditing}
+                        title={isEditing ? "Conclua a edição para poder carregar" : "Carregar Ata da Nuvem"}
+                        className="bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-200 border border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600 focus:ring-blue-500"
+                    >
+                        <DownloadCloudIcon className="w-5 h-5" />
+                        <span>Carregar</span>
+                    </ActionButton>
                     <div className="flex-grow"></div>
                     <ActionButton
                         onClick={() => exportToDocx(ata)}
-                        disabled={!isExportReady}
-                        title={isExportReady ? "Exportar para DOCX" : "Aguardando bibliotecas de exportação..."}
+                        disabled={isEditing || !isExportReady}
+                        title={isEditing ? "Conclua a edição para exportar" : (isExportReady ? "Exportar para DOCX" : "Aguardando bibliotecas de exportação...")}
                         className="bg-blue-600 text-white hover:bg-blue-700 focus:ring-blue-500"
                     >
                        <FileWordIcon className="w-5 h-5" />
@@ -312,8 +391,8 @@ const App: React.FC = () => {
                     </ActionButton>
                     <ActionButton
                         onClick={() => exportToPdf(ata)}
-                        disabled={!isExportReady}
-                        title={isExportReady ? "Exportar para PDF" : "Aguardando bibliotecas de exportação..."}
+                        disabled={isEditing || !isExportReady}
+                        title={isEditing ? "Conclua a edição para exportar" : (isExportReady ? "Exportar para PDF" : "Aguardando bibliotecas de exportação...")}
                         className="bg-red-600 text-white hover:bg-red-700 focus:ring-red-500"
                     >
                        <FilePdfIcon className="w-5 h-5" />
@@ -327,6 +406,14 @@ const App: React.FC = () => {
           </div>
         </div>
       </main>
+      <SavedAtasPanel
+        isOpen={showLoadPanel}
+        isLoading={isSavedAtasLoading}
+        error={loadError}
+        atas={savedAtas}
+        onClose={() => setShowLoadPanel(false)}
+        onSelect={handleSelectSavedAta}
+      />
       <ConfirmationDialog
         isOpen={showClearConfirmation}
         onClose={() => setShowClearConfirmation(false)}
@@ -336,6 +423,14 @@ const App: React.FC = () => {
         Tem certeza de que deseja limpar todos os campos e começar uma nova ata? Todos os dados não salvos serão perdidos.
         <br/><br/>
         <strong>Dica:</strong> Salve a ata atual na nuvem antes de limpar, caso queira recuperá-la mais tarde.
+      </ConfirmationDialog>
+      <ConfirmationDialog
+        isOpen={showOverwriteConfirmation}
+        onClose={() => setShowOverwriteConfirmation(false)}
+        onConfirm={onConfirmOverwrite}
+        title="Gerar Nova Ata"
+      >
+        Você tem certeza que deseja gerar uma nova ata? A ata atual será descartada e todas as alterações não salvas serão perdidas.
       </ConfirmationDialog>
     </div>
   );

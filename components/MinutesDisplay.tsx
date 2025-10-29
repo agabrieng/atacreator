@@ -1,14 +1,22 @@
 
 
-import React, { useCallback } from 'react';
-import type { AtaData, Participant, PautaItem } from '../types';
-import { FileTextIcon, PlusIcon, TrashIcon } from './icons';
+import React, { useCallback, useState, useRef, useEffect } from 'react';
+import type { AtaData, Participant, PautaItem, ResponsavelPrazo } from '../types';
+import { FileTextIcon, PlusIcon, TrashIcon, XIcon } from './icons';
 
-interface MinutesDisplayProps {
-  ata: AtaData | null;
-  setAta: (ata: AtaData | null) => void;
-  isEditing: boolean;
-}
+const shortenName = (fullName: string): string => {
+  if (!fullName) return '';
+  const parts = fullName.trim().split(/\s+/);
+  return parts.slice(0, 2).join(' ');
+};
+
+const COLORS = [
+    { bg: 'bg-blue-100 dark:bg-blue-900', text: 'text-blue-800 dark:text-blue-200', border: 'border-blue-300 dark:border-blue-700' },
+    { bg: 'bg-green-100 dark:bg-green-900', text: 'text-green-800 dark:text-green-200', border: 'border-green-300 dark:border-green-700' },
+    { bg: 'bg-yellow-100 dark:bg-yellow-800', text: 'text-yellow-800 dark:text-yellow-200', border: 'border-yellow-400 dark:border-yellow-700' },
+    { bg: 'bg-purple-100 dark:bg-purple-900', text: 'text-purple-800 dark:text-purple-200', border: 'border-purple-300 dark:border-purple-700' },
+    { bg: 'bg-pink-100 dark:bg-pink-900', text: 'text-pink-800 dark:text-pink-200', border: 'border-pink-300 dark:border-pink-700' },
+];
 
 const EditableInput: React.FC<{isEditing: boolean, value: string, onChange: (v:string) => void, className?: string}> = ({ isEditing, value, onChange, className }) => {
     if (!isEditing) return <div className={`font-semibold text-sm h-6 ${className}`}>{value || ''}</div>;
@@ -36,8 +44,140 @@ const PautaDescription: React.FC<{ text: string }> = ({ text }) => {
     );
 };
 
-const MinutesDisplay: React.FC<MinutesDisplayProps> = ({ ata, setAta, isEditing }) => {
+// --- Date Conversion Helpers for Prazo field ---
+const convertToInputDate = (prazo: string | null): string => {
+    if (!prazo) return '';
+    const parts = prazo.split('/');
+    if (parts.length === 3) {
+        const [day, month, year] = parts;
+        if (day?.length === 2 && month?.length === 2 && year?.length === 4) {
+            return `${year}-${month}-${day}`;
+        }
+    }
+    // Handle cases where the date might already be in 'YYYY-MM-DD' format from the date picker
+    if (prazo.match(/^\d{4}-\d{2}-\d{2}$/)) {
+        return prazo;
+    }
+    return '';
+};
 
+const convertToDisplayDate = (inputDate: string): string => {
+    if (!inputDate) return '';
+    const parts = inputDate.split('-');
+    if (parts.length === 3) {
+        const [year, month, day] = parts;
+        return `${day}/${month}/${year}`;
+    }
+    return inputDate;
+};
+
+const EditablePautaResponsibles: React.FC<{
+  responsaveis: ResponsavelPrazo[];
+  participants: Participant[];
+  onChange: (newResponsaveis: ResponsavelPrazo[]) => void;
+}> = ({ responsaveis, participants, onChange }) => {
+  const [inputValue, setInputValue] = useState('');
+  const [showDropdown, setShowDropdown] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  const participantNames = participants.map(p => p.nome);
+  const currentResponsibleNames = responsaveis.map(r => r.responsavel);
+  const availableOptions = participantNames.filter(name => !currentResponsibleNames.includes(name));
+
+  const filteredOptions = inputValue
+    ? availableOptions.filter(option =>
+        option.toLowerCase().includes(inputValue.toLowerCase())
+      )
+    : availableOptions;
+
+  const handleAdd = (name: string) => {
+    const trimmedName = name.trim();
+    if (trimmedName && !currentResponsibleNames.includes(trimmedName)) {
+      onChange([...responsaveis, { id: `${Date.now()}-${trimmedName}`, responsavel: trimmedName, prazo: null }]);
+    }
+    setInputValue('');
+    setShowDropdown(false);
+  };
+
+  const handleRemove = (idToRemove: string) => {
+    onChange(responsaveis.filter(resp => resp.id !== idToRemove));
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter' && inputValue) {
+      e.preventDefault();
+      const exactMatch = filteredOptions.find(opt => opt.toLowerCase() === inputValue.toLowerCase());
+      handleAdd(exactMatch || inputValue);
+    }
+  };
+  
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+        if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+            setShowDropdown(false);
+        }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+        document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [containerRef]);
+
+  return (
+    <div className="space-y-2">
+        {responsaveis.map((resp, index) => {
+            const color = COLORS[index % COLORS.length];
+            return (
+                <div key={resp.id} className={`flex items-center justify-between px-2.5 py-1.5 rounded-md text-sm font-semibold truncate ${color.bg} ${color.text}`}>
+                    <span title={resp.responsavel}>{shortenName(resp.responsavel)}</span>
+                    <button type="button" onClick={() => handleRemove(resp.id)} className="ml-2 -mr-1 p-0.5 rounded-full hover:bg-black/10 dark:hover:bg-white/10">
+                        <XIcon className="w-3 h-3" />
+                    </button>
+                </div>
+            );
+        })}
+      <div className="relative pt-2" ref={containerRef}>
+        <input
+          type="text"
+          value={inputValue}
+          onChange={e => setInputValue(e.target.value)}
+          onFocus={() => setShowDropdown(true)}
+          onKeyDown={handleKeyDown}
+          className={`w-full p-1 rounded-md bg-blue-50 dark:bg-gray-700/50 border border-blue-300 dark:border-blue-700 focus:outline-none focus:ring-1 focus:ring-blue-500`}
+          placeholder="Adicionar responsável..."
+        />
+        {showDropdown && (
+          <div className="absolute z-10 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md shadow-lg max-h-40 overflow-y-auto">
+            {filteredOptions.length > 0 ? (
+              filteredOptions.map(option => (
+                <div
+                  key={option}
+                  onClick={() => handleAdd(option)}
+                  className="px-3 py-2 text-sm cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700"
+                >
+                  {option}
+                </div>
+              ))
+            ) : (
+               <div className="px-3 py-2 text-sm text-gray-500">
+                 {inputValue ? `Pressione Enter para adicionar "${inputValue}"` : 'Nenhum participante para adicionar'}
+               </div>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+// FIX: Added missing props type definition for the component.
+interface MinutesDisplayProps {
+    ata: AtaData | null;
+    setAta: React.Dispatch<React.SetStateAction<AtaData | null>>;
+    isEditing: boolean;
+}
+
+const MinutesDisplay: React.FC<MinutesDisplayProps> = ({ ata, setAta, isEditing }) => {
     // --- Edit Handlers ---
     const handleAtaChange = useCallback(<K extends keyof AtaData>(field: K, value: AtaData[K]) => {
         if (!ata) return;
@@ -52,8 +192,6 @@ const MinutesDisplay: React.FC<MinutesDisplayProps> = ({ ata, setAta, isEditing 
             }
             const updatedParticipant = { ...p };
             if (field === 'status') {
-                // The value from a select input is a string, so we cast it to the specific
-                // union type required for the 'status' property.
                 updatedParticipant.status = value as Participant['status'];
             } else {
                 (updatedParticipant as any)[field] = value;
@@ -65,7 +203,6 @@ const MinutesDisplay: React.FC<MinutesDisplayProps> = ({ ata, setAta, isEditing 
     
     const addParticipant = () => {
         if (!ata) return;
-        // Fix: Explicitly cast status to the specific union type to prevent type widening issues.
         const newParticipants = [...ata.participantes, { id: Date.now().toString(), empresa: '', nome: '', email: '', status: 'P' as Participant['status'] }];
         setAta({ ...ata, participantes: newParticipants });
     };
@@ -75,7 +212,7 @@ const MinutesDisplay: React.FC<MinutesDisplayProps> = ({ ata, setAta, isEditing 
         setAta({ ...ata, participantes: ata.participantes.filter(p => p.id !== id) });
     };
 
-    const handlePautaChange = useCallback((index: number, field: keyof PautaItem, value: string | string[]) => {
+    const handlePautaChange = useCallback((index: number, field: keyof PautaItem, value: any) => {
         if (!ata) return;
         const newPauta = [...ata.pauta];
         (newPauta[index] as any)[field] = value;
@@ -85,7 +222,7 @@ const MinutesDisplay: React.FC<MinutesDisplayProps> = ({ ata, setAta, isEditing 
     const addPautaItem = () => {
         if (!ata) return;
         const newItemNumber = ata.pauta.length > 0 ? `${parseInt(ata.pauta[ata.pauta.length - 1].item.replace('.', '')) + 1}.` : '1.';
-        const newPauta = [...ata.pauta, { item: newItemNumber, descricao: '', responsaveis: [], prazo: null }];
+        const newPauta = [...ata.pauta, { item: newItemNumber, descricao: '', responsaveis: [] }];
         setAta({ ...ata, pauta: newPauta });
     };
 
@@ -197,8 +334,8 @@ const MinutesDisplay: React.FC<MinutesDisplayProps> = ({ ata, setAta, isEditing 
                 <tr className="bg-gray-100 dark:bg-gray-700">
                     <th className="p-2 border dark:border-gray-600 font-bold w-16">Item</th>
                     <th className="p-2 border dark:border-gray-600 font-bold">Descrição</th>
-                    <th className="p-2 border dark:border-gray-600 font-bold w-48">Responsável(eis)</th>
-                    <th className="p-2 border dark:border-gray-600 font-bold w-32">Prazo</th>
+                    <th className="p-2 border dark:border-gray-600 font-bold w-1/3">Responsável(eis)</th>
+                    <th className="p-2 border dark:border-gray-600 font-bold w-1/4">Prazo</th>
                     {isEditing && <th className="p-2 border dark:border-gray-600 font-bold w-10"></th>}
                 </tr>
             </thead>
@@ -207,9 +344,67 @@ const MinutesDisplay: React.FC<MinutesDisplayProps> = ({ ata, setAta, isEditing 
                     <tr key={index}>
                         <td className="p-2 border dark:border-gray-600 text-center"><EditableInput isEditing={isEditing} value={item.item} onChange={v => handlePautaChange(index, 'item', v)} className="text-center font-semibold" /></td>
                         <td className="p-2 border dark:border-gray-600">{isEditing ? <EditableTextarea isEditing={isEditing} value={item.descricao} onChange={v => handlePautaChange(index, 'descricao', v)} /> : <PautaDescription text={item.descricao} />}</td>
-                        <td className="p-2 border dark:border-gray-600"><EditableInput isEditing={isEditing} value={item.responsaveis.join(', ')} onChange={v => handlePautaChange(index, 'responsaveis', v.split(',').map(s=>s.trim()))} /></td>
-                        <td className="p-2 border dark:border-gray-600"><EditableInput isEditing={isEditing} value={item.prazo || ''} onChange={v => handlePautaChange(index, 'prazo', v)} /></td>
-                        {isEditing && <td className="p-2 border dark:border-gray-600 text-center"><button onClick={() => removePautaItem(index)} className="text-red-500 hover:text-red-700"><TrashIcon className="w-4 h-4" /></button></td>}
+                        
+                        {isEditing ? (
+                            <>
+                                <td className="p-2 border dark:border-gray-600 align-top">
+                                    <EditablePautaResponsibles 
+                                        responsaveis={item.responsaveis}
+                                        participants={ata.participantes}
+                                        onChange={v => handlePautaChange(index, 'responsaveis', v)}
+                                    />
+                                </td>
+                                <td className="p-2 border dark:border-gray-600 align-top">
+                                    <div className="space-y-2">
+                                        {item.responsaveis.map((resp, respIndex) => {
+                                            const color = COLORS[respIndex % COLORS.length];
+                                            const handlePrazoChangeForThis = (newPrazo: string | null) => {
+                                                const newResponsaveis = item.responsaveis.map(r => r.id === resp.id ? { ...r, prazo: newPrazo } : r);
+                                                handlePautaChange(index, 'responsaveis', newResponsaveis);
+                                            };
+                                            return (
+                                                <input
+                                                    key={resp.id}
+                                                    type="date"
+                                                    value={convertToInputDate(resp.prazo)}
+                                                    onChange={e => handlePrazoChangeForThis(convertToDisplayDate(e.target.value))}
+                                                    className={`p-1 rounded-md border text-sm w-full h-[38px] ${color.bg} ${color.text} ${color.border} focus:outline-none focus:ring-1 focus:ring-blue-500`}
+                                                />
+                                            );
+                                        })}
+                                    </div>
+                                </td>
+                            </>
+                        ) : (
+                            <>
+                                <td className="p-2 border dark:border-gray-600 align-top">
+                                    <div className="space-y-1">
+                                        {item.responsaveis.map((resp, respIndex) => {
+                                            const color = COLORS[respIndex % COLORS.length];
+                                            return (
+                                                <div key={resp.id} title={resp.responsavel} className={`flex items-center justify-center h-[30px] px-2.5 py-1 rounded-md text-sm font-semibold truncate ${color.bg} ${color.text}`}>
+                                                    {shortenName(resp.responsavel)}
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                </td>
+                                <td className="p-2 border dark:border-gray-600 align-top">
+                                    <div className="space-y-1">
+                                        {item.responsaveis.map((resp, respIndex) => {
+                                            const color = COLORS[respIndex % COLORS.length];
+                                            return (
+                                                <div key={resp.id} className={`flex items-center justify-center h-[30px] px-2.5 py-1 rounded-md text-sm font-semibold truncate ${color.bg} ${color.text}`}>
+                                                    {resp.prazo || 'N/A'}
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                </td>
+                            </>
+                        )}
+                        
+                        {isEditing && <td className="p-2 border dark:border-gray-600 text-center align-middle"><button onClick={() => removePautaItem(index)} className="text-red-500 hover:text-red-700"><TrashIcon className="w-4 h-4" /></button></td>}
                     </tr>
                 ))}
             </tbody>

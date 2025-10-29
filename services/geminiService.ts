@@ -1,5 +1,4 @@
 import { GoogleGenAI, Type } from "@google/genai";
-import type { PautaItem } from '../types';
 import { GEMINI_MODEL } from '../constants';
 
 interface GeminiParticipant {
@@ -7,10 +6,18 @@ interface GeminiParticipant {
     empresa: string | null;
 }
 
-interface GeminiOutput {
+// Define this locally to avoid conflict with the app's PautaItem
+interface GeminiPautaItem {
+    item: string;
+    descricao: string;
+    responsaveis: string[];
+    prazo: string | null;
+}
+
+export interface GeminiOutput {
   data: string;
   horario: string;
-  pauta: PautaItem[];
+  pauta: GeminiPautaItem[];
   observacoes: string;
   participantes: GeminiParticipant[];
 }
