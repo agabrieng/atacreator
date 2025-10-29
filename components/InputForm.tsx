@@ -1,8 +1,9 @@
 
 
+
 import React, { useRef, useState, useEffect } from 'react';
-import { SparklesIcon, XIcon, UploadCloudIcon, SettingsIcon, PlusIcon, DownloadCloudIcon } from './icons';
-import type { AdminSettings } from '../types';
+import { SparklesIcon, XIcon, UploadCloudIcon, SettingsIcon, PlusIcon, DownloadCloudIcon, EditIcon } from './icons';
+import type { AdminSettings, Empreendimento } from '../types';
 import SettingsPanel from './SettingsPanel';
 import CollapsibleSection from './CollapsibleSection';
 
@@ -12,12 +13,13 @@ interface InputFormProps {
   onSettingsSave: (profiles: Record<string, AdminSettings>, currentCompany: string) => void;
   empreendimento: string;
   setEmpreendimento: (value: string) => void;
+  empreendimentos: Empreendimento[];
+  isProjectsLoading: boolean;
+  onOpenProjectPanel: () => void;
   area: string;
   setArea: (value: string) => void;
   titulo: string;
   setTitulo: (value: string) => void;
-  contrato: string;
-  setContrato: (value: string) => void;
   assunto: string;
   setAssunto: (value: string) => void;
   local: string;
@@ -31,7 +33,7 @@ interface InputFormProps {
   onOpenLoadPanel: () => void;
 }
 
-const FormInput: React.FC<{ label: string; id: string; value: string; onChange: (e: React.ChangeEvent<HTMLInputElement>) => void; placeholder?: string; onBlur?: (e: React.FocusEvent<HTMLInputElement>) => void; }> = ({ label, id, value, onChange, placeholder, onBlur }) => (
+const FormInput: React.FC<{ label: string; id: string; value: string; onChange: (e: React.ChangeEvent<HTMLInputElement>) => void; placeholder?: string; }> = ({ label, id, value, onChange, placeholder }) => (
     <div>
         <label htmlFor={id} className="block text-sm font-medium text-gray-600 dark:text-gray-300">
           {label}
@@ -41,7 +43,6 @@ const FormInput: React.FC<{ label: string; id: string; value: string; onChange: 
           type="text"
           value={value}
           onChange={onChange}
-          onBlur={onBlur}
           placeholder={placeholder}
           className="mt-1 block w-full px-3 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
         />
@@ -67,27 +68,6 @@ const InputForm: React.FC<InputFormProps> = (props) => {
         return () => clearInterval(interval);
     }
   }, []);
-
-  const handleContratoBlur = (e: React.FocusEvent<HTMLInputElement>) => {
-    const contrato = e.target.value.trim();
-    if (!contrato) return;
-    try {
-      const savedHeadersStr = localStorage.getItem('ata-header-data');
-      if (savedHeadersStr) {
-        const savedHeaders = JSON.parse(savedHeadersStr);
-        const data = savedHeaders[contrato];
-        if (data) {
-          props.setEmpreendimento(data.empreendimento || '');
-          props.setArea(data.area || '');
-          props.setTitulo(data.titulo || '');
-          props.setAssunto(data.assunto || '');
-          props.setLocal(data.local || '');
-        }
-      }
-    } catch (err) {
-      console.error("Failed to load header data from localStorage", err);
-    }
-  };
 
   const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -146,10 +126,32 @@ const InputForm: React.FC<InputFormProps> = (props) => {
       </div>
       
       <CollapsibleSection title="1. Detalhes do Cabeçalho" defaultOpen={true}>
-        <FormInput label="Empreendimento" id="empreendimento" value={props.empreendimento} onChange={(e) => props.setEmpreendimento(e.target.value)} placeholder="Nome do projeto ou obra" />
+        <div>
+            <label htmlFor="empreendimento" className="block text-sm font-medium text-gray-600 dark:text-gray-300">
+                Empreendimento
+            </label>
+            <div className="mt-1 flex items-center gap-2">
+                <select
+                    id="empreendimento"
+                    value={props.empreendimento}
+                    onChange={(e) => props.setEmpreendimento(e.target.value)}
+                    className="block w-full px-3 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 disabled:opacity-75"
+                    disabled={props.isProjectsLoading}
+                >
+                    <option value="">{props.isProjectsLoading ? 'Carregando...' : 'Selecione um empreendimento'}</option>
+                    {props.empreendimentos.map((proj) => (
+                        <option key={proj.id} value={proj.name}>
+                        {proj.name}
+                        </option>
+                    ))}
+                </select>
+                <button type="button" onClick={props.onOpenProjectPanel} title="Gerenciar Empreendimentos" className="p-2.5 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-md border border-gray-300 dark:border-gray-600">
+                    <EditIcon className="w-5 h-5 text-gray-600 dark:text-gray-300" />
+                </button>
+            </div>
+        </div>
         <FormInput label="Área" id="area" value={props.area} onChange={(e) => props.setArea(e.target.value)} placeholder="Departamento ou setor responsável" />
         <FormInput label="Título do Documento" id="titulo" value={props.titulo} onChange={(e) => props.setTitulo(e.target.value)} placeholder="Ex: ATA DE REUNIÃO" />
-        <FormInput label="Contrato" id="contrato" value={props.contrato} onChange={(e) => props.setContrato(e.target.value)} placeholder="Número ou nome do contrato" onBlur={handleContratoBlur} />
         <FormInput label="Assunto" id="assunto" value={props.assunto} onChange={(e) => props.setAssunto(e.target.value)} placeholder="Assunto principal da reunião" />
         <FormInput label="Local" id="local" value={props.local} onChange={(e) => props.setLocal(e.target.value)} placeholder="Ex: Microsoft Teams, Sala de Reunião A" />
       </CollapsibleSection>

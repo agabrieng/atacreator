@@ -1,4 +1,3 @@
-
 export interface AdminSettings {
   companyName: string;
   companyLogo: string | null; // base64 string
@@ -57,4 +56,10 @@ export interface AtaData {
 
   // Footer
   informacaoPropriedade: string;
+}
+
+export interface Empreendimento {
+  id: string;
+  name: string;
+  contrato: string;
 }

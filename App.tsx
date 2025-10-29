@@ -1,9 +1,8 @@
 
-
 import React, { useState, useCallback, useEffect } from 'react';
-import type { AtaData, AdminSettings, Participant, PautaItem } from './types';
+import type { AtaData, AdminSettings, Participant, PautaItem, Empreendimento } from './types';
 import { generateAtaData } from './services/geminiService';
-import { saveAtaToFirestore, loadAtasFromFirestore, deleteAtaFromFirestore } from './services/firebaseService';
+import { saveAtaToFirestore, loadAtasFromFirestore, deleteAtaFromFirestore, getEmpreendimentos, addEmpreendimento, updateEmpreendimento, deleteEmpreendimento } from './services/firebaseService';
 import { exportToDocx, exportToPdf } from './services/exportService';
 import Header from './components/Header';
 import InputForm from './components/InputForm';
@@ -11,7 +10,8 @@ import MinutesDisplay from './components/MinutesDisplay';
 import Loader from './components/Loader';
 import ConfirmationDialog from './components/ConfirmationDialog';
 import SavedAtasPanel from './components/SavedAtasPanel';
-import { AlertTriangleIcon, EditIcon, CheckIcon, CopyIcon, UploadCloudIcon, DownloadCloudIcon, FileWordIcon, FilePdfIcon } from './components/icons';
+import ProjectManagementPanel from './components/ProjectManagementPanel';
+import { AlertTriangleIcon, EditIcon, CheckIcon, CopyIcon, UploadCloudIcon, DownloadCloudIcon, FileWordIcon, FilePdfIcon, ExternalLinkIcon } from './components/icons';
 
 const DEFAULT_COMPANY_NAME = "Minha Empresa";
 const DEFAULT_SETTINGS: AdminSettings = {
@@ -57,6 +57,7 @@ const App: React.FC = () => {
   const [ata, setAta] = useState<AtaData | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
+  const [indexErrorUrl, setIndexErrorUrl] = useState<string | null>(null);
   const [showClearConfirmation, setShowClearConfirmation] = useState(false);
   const [showOverwriteConfirmation, setShowOverwriteConfirmation] = useState(false);
   const [showSaveReminder, setShowSaveReminder] = useState(false);
@@ -79,6 +80,11 @@ const App: React.FC = () => {
   // State for deleting atas
   const [showDeleteConfirmation, setShowDeleteConfirmation] = useState(false);
   const [ataToDelete, setAtaToDelete] = useState<AtaData | null>(null);
+
+  // State for Projects (Empreendimentos)
+  const [empreendimentos, setEmpreendimentos] = useState<Empreendimento[]>([]);
+  const [isProjectsLoading, setIsProjectsLoading] = useState(true);
+  const [isProjectPanelOpen, setIsProjectPanelOpen] = useState(false);
 
 
   useEffect(() => {
@@ -105,6 +111,37 @@ const App: React.FC = () => {
       setCompanyProfiles({ [DEFAULT_COMPANY_NAME]: DEFAULT_SETTINGS });
       setCurrentCompanyName(DEFAULT_COMPANY_NAME);
     }
+    
+    const fetchEmpreendimentos = async () => {
+        try {
+            setIsProjectsLoading(true);
+            setIndexErrorUrl(null); // Reset on each fetch attempt
+            const loadedEmpreendimentos = await getEmpreendimentos();
+            setEmpreendimentos(loadedEmpreendimentos);
+        } catch (error: any) {
+            console.error("Failed to load empreendimentos", error);
+            let errorMessage = "Falha ao carregar a lista de empreendimentos.";
+            const errorMessageText = error?.message?.toLowerCase() || '';
+            
+            if (error?.code === 'permission-denied' || errorMessageText.includes('insufficient permissions')) {
+              errorMessage = `Erro de Permissão: Acesso negado ao banco de dados. As Regras de Segurança do Firestore estão bloqueando a solicitação.\n\nPara permitir que o aplicativo funcione, atualize as regras no seu console do Firebase para permitir acesso público às coleções 'atas' e 'empreendimentos'.\n\nExemplo de regras:\n\nrules_version = '2';\nservice cloud.firestore {\n  match /databases/{database}/documents {\n    match /atas/{document=**} {\n      allow read, write: if true;\n    }\n    match /empreendimentos/{document=**} {\n      allow read, write: if true;\n    }\n  }\n}`;
+            } else if (error?.code === 'failed-precondition' && errorMessageText.includes('query requires an index')) {
+                const urlRegex = /(https?:\/\/[^\s]+)/;
+                const urlMatch = error.message.match(urlRegex);
+                const extractedUrl = urlMatch ? urlMatch[0] : null;
+                setIndexErrorUrl(extractedUrl);
+
+                errorMessage = `Erro de Configuração do Banco de Dados: A consulta para ordenar os empreendimentos precisa de um 'índice' no Firestore.\n\nIsso é necessário para otimizar a ordenação dos dados.\n\n**Solução:** Clique no botão abaixo para criar o índice automaticamente no seu painel do Firebase. Após a criação (pode levar alguns minutos), atualize esta página.`;
+
+            } else if (error instanceof Error) {
+                errorMessage = `Falha ao carregar empreendimentos: ${error.message}`;
+            }
+            setError(errorMessage);
+        } finally {
+            setIsProjectsLoading(false);
+        }
+    };
+    fetchEmpreendimentos();
   }, []);
   
     useEffect(() => {
@@ -120,12 +157,79 @@ const App: React.FC = () => {
         return () => clearInterval(interval);
     }, []);
 
+    useEffect(() => {
+        const selectedProject = empreendimentos.find(p => p.name === empreendimento);
+        if (selectedProject) {
+            const newContrato = selectedProject.contrato;
+            setContrato(newContrato);
+    
+            // Auto-fill other header data from localStorage cache if available
+            if (newContrato) {
+                try {
+                    const savedHeadersStr = localStorage.getItem('ata-header-data');
+                    if (savedHeadersStr) {
+                        const savedHeaders = JSON.parse(savedHeadersStr);
+                        const data = savedHeaders[newContrato];
+                        if (data) {
+                            setArea(data.area || '');
+                            setTitulo(data.titulo || '');
+                            setAssunto(data.assunto || '');
+                            setLocal(data.local || '');
+                        }
+                    }
+                } catch (err) {
+                    console.error("Failed to load header data from localStorage", err);
+                }
+            }
+        }
+    }, [empreendimento, empreendimentos]);
+
   const handleSettingsSave = useCallback((profiles: Record<string, AdminSettings>, currentCompany: string) => {
     setCompanyProfiles(profiles);
     setCurrentCompanyName(currentCompany);
     localStorage.setItem('ata-company-profiles', JSON.stringify(profiles));
     localStorage.setItem('ata-current-company-name', currentCompany);
   }, []);
+
+  // --- Project Management Handlers ---
+  const handleAddProject = async (name: string, contrato: string) => {
+    try {
+        const newId = await addEmpreendimento(name, contrato);
+        const newProject = { id: newId, name, contrato };
+        setEmpreendimentos(prev => [...prev, newProject].sort((a, b) => a.name.localeCompare(b.name)));
+    } catch (error) {
+        console.error("Failed to add project:", error);
+        alert("Falha ao adicionar empreendimento.");
+    }
+  };
+
+  const handleUpdateProject = async (id: string, newName: string, newContrato: string) => {
+    try {
+        await updateEmpreendimento(id, newName, newContrato);
+        setEmpreendimentos(prev => prev.map(p => p.id === id ? { ...p, name: newName, contrato: newContrato } : p).sort((a, b) => a.name.localeCompare(b.name)));
+    } catch (error) {
+        console.error("Failed to update project:", error);
+        alert("Falha ao atualizar empreendimento.");
+    }
+  };
+  
+  const handleDeleteProject = async (id: string) => {
+    try {
+        const projectToDelete = empreendimentos.find(p => p.id === id);
+        if (!projectToDelete) return;
+
+        await deleteEmpreendimento(id);
+        
+        setEmpreendimentos(prev => prev.filter(p => p.id !== id));
+
+        if (empreendimento === projectToDelete.name) {
+            setEmpreendimento('');
+        }
+    } catch (error) {
+        console.error("Failed to delete project:", error);
+        alert("Falha ao excluir empreendimento.");
+    }
+  };
 
   const handleGenerate = useCallback(async () => {
     if (!vttContent.trim() || !titulo.trim() || !empreendimento.trim()) {
@@ -137,6 +241,7 @@ const App: React.FC = () => {
       return;
     }
     
+    // Save header data to localStorage for quick recall
     if (contrato.trim()) {
         try {
             const savedHeadersStr = localStorage.getItem('ata-header-data') || '{}';
@@ -150,6 +255,7 @@ const App: React.FC = () => {
 
     setIsLoading(true);
     setError(null);
+    setIndexErrorUrl(null);
     setAta(null);
     setOriginalLoadedAta(null); // Reset loaded ata state
     setIsEditing(false); // Reset editing mode on new generation
@@ -244,6 +350,7 @@ const App: React.FC = () => {
     setAta(null);
     setOriginalLoadedAta(null); // Reset loaded ata state
     setError(null);
+    setIndexErrorUrl(null);
     setIsEditing(false); // Reset editing state
   }, []);
   
@@ -358,9 +465,11 @@ const App: React.FC = () => {
             currentCompanyName={currentCompanyName}
             onSettingsSave={handleSettingsSave}
             empreendimento={empreendimento} setEmpreendimento={setEmpreendimento}
+            empreendimentos={empreendimentos}
+            isProjectsLoading={isProjectsLoading}
+            onOpenProjectPanel={() => setIsProjectPanelOpen(true)}
             area={area} setArea={setArea}
             titulo={titulo} setTitulo={setTitulo}
-            contrato={contrato} setContrato={setContrato}
             assunto={assunto} setAssunto={setAssunto}
             local={local} setLocal={setLocal}
             vttContent={vttContent} setVttContent={setVttContent}
@@ -373,10 +482,18 @@ const App: React.FC = () => {
           <div className="relative lg:sticky top-8 bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 min-h-[calc(100vh-10rem)]">
             {isLoading && <Loader />}
             {error && (
-              <div className="flex flex-col items-center justify-center h-full text-center text-red-500">
-                <AlertTriangleIcon className="w-16 h-16 mb-4" />
-                <h3 className="text-xl font-semibold mb-2">Erro ao Processar</h3>
-                <p className="max-w-md">{error}</p>
+              <div className="flex flex-col items-center justify-center h-full text-center p-4">
+                <AlertTriangleIcon className="w-16 h-16 mb-4 text-red-500" />
+                <h3 className="text-xl font-semibold mb-3 text-gray-800 dark:text-gray-100">Ocorreu um Erro</h3>
+                <div className="max-w-2xl w-full bg-red-50 dark:bg-gray-700/50 text-red-700 dark:text-red-300 p-4 rounded-lg text-left font-mono text-sm overflow-auto">
+                    <pre className="whitespace-pre-wrap break-words">{error}</pre>
+                </div>
+                {indexErrorUrl && (
+                    <a href={indexErrorUrl} target="_blank" rel="noopener noreferrer" className="mt-4 inline-flex items-center gap-2 px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                        <ExternalLinkIcon className="w-4 h-4" />
+                        Criar Índice no Firebase
+                    </a>
+                )}
               </div>
             )}
             {!isLoading && !error && (
@@ -444,6 +561,14 @@ const App: React.FC = () => {
         onClose={() => setShowLoadPanel(false)}
         onSelect={handleSelectSavedAta}
         onDelete={handleDeleteClick}
+      />
+       <ProjectManagementPanel
+        isOpen={isProjectPanelOpen}
+        onClose={() => setIsProjectPanelOpen(false)}
+        projects={empreendimentos}
+        onAdd={handleAddProject}
+        onUpdate={handleUpdateProject}
+        onDelete={handleDeleteProject}
       />
       <ConfirmationDialog
         isOpen={showClearConfirmation}

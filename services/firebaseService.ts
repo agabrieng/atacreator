@@ -1,11 +1,18 @@
 
-
-// Fix: Switched to Firebase v8/compat API to resolve module export errors.
-// The errors suggest that the installed Firebase version doesn't match the v9 modular syntax used previously.
-// The compat library provides the familiar v8 API surface while using the v9 SDK under the hood.
-import firebase from 'firebase/compat/app';
-import 'firebase/compat/firestore';
-import type { AtaData } from '../types';
+import { initializeApp } from "firebase/app";
+import { 
+    getFirestore, 
+    collection, 
+    getDocs, 
+    addDoc, 
+    doc, 
+    setDoc, 
+    updateDoc, 
+    deleteDoc, 
+    query, 
+    orderBy 
+} from "firebase/firestore";
+import type { AtaData, Empreendimento } from '../types';
 
 // Your web app's Firebase configuration
 const firebaseConfig = {
@@ -20,12 +27,11 @@ const firebaseConfig = {
 
 
 // Initialize Firebase
-if (!firebase.apps.length) {
-    firebase.initializeApp(firebaseConfig);
-}
-export const db = firebase.firestore();
+const app = initializeApp(firebaseConfig);
+export const db = getFirestore(app);
 
-const atasCollectionRef = db.collection("atas");
+const atasCollectionRef = collection(db, "atas");
+const empreendimentosCollectionRef = collection(db, "empreendimentos");
 
 /**
  * Saves or updates an AtaData object in the 'atas' collection in Firestore.
@@ -47,19 +53,19 @@ export const saveAtaToFirestore = async (ataData: AtaData): Promise<string> => {
 
         if (id) {
             // If ID exists, update the document
-            const docRef = atasCollectionRef.doc(id);
-            await docRef.set(dataToSave);
+            const docRef = doc(atasCollectionRef, id);
+            await setDoc(docRef, dataToSave);
             console.log("Document updated with ID: ", id);
             return id;
         } else {
             // Otherwise, create a new document
-            const docRef = await atasCollectionRef.add(dataToSave);
+            const docRef = await addDoc(atasCollectionRef, dataToSave);
             console.log("Document written with ID: ", docRef.id);
             return docRef.id;
         }
     } catch (e) {
         console.error("Error saving document: ", e);
-        throw new Error("Failed to save data to Firestore.");
+        throw e;
     }
 };
 
@@ -69,7 +75,7 @@ export const saveAtaToFirestore = async (ataData: AtaData): Promise<string> => {
  */
 export const loadAtasFromFirestore = async (): Promise<AtaData[]> => {
     try {
-        const querySnapshot = await atasCollectionRef.get();
+        const querySnapshot = await getDocs(atasCollectionRef);
         const atas: AtaData[] = [];
         querySnapshot.forEach((doc) => {
             const data = doc.data() as any; // Cast to any to handle migration
@@ -94,7 +100,7 @@ export const loadAtasFromFirestore = async (): Promise<AtaData[]> => {
         return atas;
     } catch (e) {
         console.error("Error getting documents: ", e);
-        throw new Error("Failed to load data from Firestore.");
+        throw e;
     }
 };
 
@@ -105,11 +111,76 @@ export const loadAtasFromFirestore = async (): Promise<AtaData[]> => {
 export const deleteAtaFromFirestore = async (id: string): Promise<void> => {
     try {
         if (!id) throw new Error("Document ID is required for deletion.");
-        const docRef = atasCollectionRef.doc(id);
-        await docRef.delete();
+        const docRef = doc(atasCollectionRef, id);
+        await deleteDoc(docRef);
         console.log("Document with ID deleted: ", id);
     } catch (e) {
         console.error("Error deleting document: ", e);
-        throw new Error("Failed to delete data from Firestore.");
+        throw e;
+    }
+};
+
+/**
+ * Loads all documents from the 'empreendimentos' collection in Firestore.
+ * @returns A promise that resolves to an array of Empreendimento objects.
+ */
+export const getEmpreendimentos = async (): Promise<Empreendimento[]> => {
+    try {
+        const q = query(empreendimentosCollectionRef, orderBy("name", "asc"));
+        const querySnapshot = await getDocs(q);
+        return querySnapshot.docs.map(doc => ({
+            id: doc.id,
+            name: doc.data().name,
+            contrato: doc.data().contrato || '',
+        }));
+    } catch (e) {
+        console.error("Error getting empreendimentos: ", e);
+        throw e;
+    }
+};
+
+/**
+ * Adds a new empreendimento to Firestore.
+ * @param name The name of the new empreendimento.
+ * @param contrato The contract associated with the empreendimento.
+ * @returns The ID of the newly created document.
+ */
+export const addEmpreendimento = async (name: string, contrato: string): Promise<string> => {
+    try {
+        const docRef = await addDoc(empreendimentosCollectionRef, { name, contrato });
+        return docRef.id;
+    } catch (e) {
+        console.error("Error adding empreendimento: ", e);
+        throw e;
+    }
+};
+
+/**
+ * Updates an existing empreendimento in Firestore.
+ * @param id The ID of the document to update.
+ * @param name The new name for the empreendimento.
+ * @param contrato The new contract for the empreendimento.
+ */
+export const updateEmpreendimento = async (id: string, name: string, contrato: string): Promise<void> => {
+    try {
+        const docRef = doc(empreendimentosCollectionRef, id);
+        await updateDoc(docRef, { name, contrato });
+    } catch (e) {
+        console.error("Error updating empreendimento: ", e);
+        throw e;
+    }
+};
+
+/**
+ * Deletes an empreendimento from Firestore.
+ * @param id The ID of the document to delete.
+ */
+export const deleteEmpreendimento = async (id: string): Promise<void> => {
+    try {
+        const docRef = doc(empreendimentosCollectionRef, id);
+        await deleteDoc(docRef);
+    } catch (e) {
+        console.error("Error deleting empreendimento: ", e);
+        throw e;
     }
 };
