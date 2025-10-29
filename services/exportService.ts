@@ -317,6 +317,20 @@ export const exportToPdf = async (ata: AtaData): Promise<void> => {
     });
 
     // --- Pauta ---
+    // Create consistent color map for responsibles, just like in the UI
+    const allResponsibleNames = new Set<string>();
+    ata.pauta.forEach(item => {
+        item.responsaveis.forEach(resp => {
+            allResponsibleNames.add(resp.responsavel);
+        });
+    });
+
+    const responsibleColorMap: Record<string, typeof PDF_COLORS[number]> = {};
+    Array.from(allResponsibleNames).sort().forEach((name, index) => {
+        responsibleColorMap[name] = PDF_COLORS[index % PDF_COLORS.length];
+    });
+
+
     const pautaBody: any[] = [];
     ata.pauta.forEach(item => {
         const numResponsaveis = item.responsaveis.length;
@@ -329,7 +343,7 @@ export const exportToPdf = async (ata: AtaData): Promise<void> => {
             ]);
         } else {
             item.responsaveis.forEach((resp, respIndex) => {
-                const color = PDF_COLORS[respIndex % PDF_COLORS.length];
+                const color = responsibleColorMap[resp.responsavel] || PDF_COLORS[0]; // Use the consistent color map
                 const cellStyles = {
                     fillColor: color.bg,
                     textColor: color.text,

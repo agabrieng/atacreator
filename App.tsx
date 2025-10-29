@@ -1,4 +1,5 @@
 
+
 import React, { useState, useCallback, useEffect } from 'react';
 import type { AtaData, AdminSettings, Participant, PautaItem, Empreendimento } from './types';
 import { generateAtaData } from './services/geminiService';
@@ -62,6 +63,8 @@ const App: React.FC = () => {
   const [showOverwriteConfirmation, setShowOverwriteConfirmation] = useState(false);
   const [showSaveReminder, setShowSaveReminder] = useState(false);
   const [originalLoadedAta, setOriginalLoadedAta] = useState<AtaData | null>(null);
+  const [showDeadlineError, setShowDeadlineError] = useState(false);
+  const [invalidDeadlineFields, setInvalidDeadlineFields] = useState<Set<string>>(new Set());
 
 
   // State for the action toolbar
@@ -259,6 +262,7 @@ const App: React.FC = () => {
     setAta(null);
     setOriginalLoadedAta(null); // Reset loaded ata state
     setIsEditing(false); // Reset editing mode on new generation
+    setInvalidDeadlineFields(new Set()); // Clear validation state
 
     try {
       const generatedPart = await generateAtaData(vttContent, titulo);
@@ -352,6 +356,7 @@ const App: React.FC = () => {
     setError(null);
     setIndexErrorUrl(null);
     setIsEditing(false); // Reset editing state
+    setInvalidDeadlineFields(new Set()); // Clear validation state
   }, []);
   
   const onConfirmClear = () => {
@@ -445,13 +450,38 @@ const App: React.FC = () => {
   }, [ata]);
 
   const handleToggleEditing = () => {
-      // When finishing editing, check if a loaded ata has been modified
-      if (isEditing && originalLoadedAta) {
-          if (JSON.stringify(ata) !== JSON.stringify(originalLoadedAta)) {
-              setShowSaveReminder(true);
-          }
-      }
-      setIsEditing(!isEditing);
+    // When user wants to FINISH editing
+    if (isEditing) {
+        if (ata) {
+            const missingDeadlines = new Set<string>();
+            ata.pauta.forEach((pautaItem, pautaIndex) => {
+                pautaItem.responsaveis.forEach(responsavel => {
+                    if (!responsavel.prazo || responsavel.prazo.trim() === '') {
+                        missingDeadlines.add(`${pautaIndex}-${responsavel.id}`);
+                    }
+                });
+            });
+
+            if (missingDeadlines.size > 0) {
+                setInvalidDeadlineFields(missingDeadlines);
+                setShowDeadlineError(true);
+                return; // Keep editing mode active
+            }
+        }
+        
+        // Check if a loaded ata has been modified
+        if (originalLoadedAta) {
+            if (JSON.stringify(ata) !== JSON.stringify(originalLoadedAta)) {
+                setShowSaveReminder(true);
+            }
+        }
+        setIsEditing(false);
+        setInvalidDeadlineFields(new Set()); // Clear on successful exit
+    } else {
+        // When user wants to START editing
+        setIsEditing(true);
+        setInvalidDeadlineFields(new Set()); // Clear when entering edit mode
+    }
   };
 
 
@@ -547,7 +577,7 @@ const App: React.FC = () => {
                     </ActionButton>
                   </div>
                 )}
-                <MinutesDisplay ata={ata} setAta={setAta} isEditing={isEditing} />
+                <MinutesDisplay ata={ata} setAta={setAta} isEditing={isEditing} invalidDeadlineFields={invalidDeadlineFields} />
               </>
             )}
           </div>
@@ -599,6 +629,17 @@ const App: React.FC = () => {
       >
         Você fez alterações nesta ata. Para mantê-las, clique no botão "Salvar".
         As alterações não salvas serão perdidas ao gerar ou carregar uma nova ata.
+      </ConfirmationDialog>
+      <ConfirmationDialog
+        isOpen={showDeadlineError}
+        onClose={() => setShowDeadlineError(false)}
+        onConfirm={() => setShowDeadlineError(false)}
+        title="Prazos Pendentes"
+        icon="alert"
+        confirmText="Entendido"
+        hideCancel={true}
+      >
+        Todos os responsáveis devem ter um prazo definido. Por favor, preencha as datas pendentes destacadas em vermelho antes de concluir a edição.
       </ConfirmationDialog>
       <ConfirmationDialog
         isOpen={showDeleteConfirmation}

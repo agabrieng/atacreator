@@ -1,6 +1,6 @@
 
 
-import React, { useCallback, useState, useRef, useEffect } from 'react';
+import React, { useCallback, useState, useRef, useEffect, useMemo } from 'react';
 import type { AtaData, Participant, PautaItem, ResponsavelPrazo } from '../types';
 import { FileTextIcon, PlusIcon, TrashIcon, XIcon } from './icons';
 
@@ -75,7 +75,8 @@ const EditablePautaResponsibles: React.FC<{
   responsaveis: ResponsavelPrazo[];
   participants: Participant[];
   onChange: (newResponsaveis: ResponsavelPrazo[]) => void;
-}> = ({ responsaveis, participants, onChange }) => {
+  colorMap: Record<string, typeof COLORS[number]>;
+}> = ({ responsaveis, participants, onChange, colorMap }) => {
   const [inputValue, setInputValue] = useState('');
   const [showDropdown, setShowDropdown] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -126,7 +127,7 @@ const EditablePautaResponsibles: React.FC<{
   return (
     <div className="space-y-2">
         {responsaveis.map((resp, index) => {
-            const color = COLORS[index % COLORS.length];
+            const color = colorMap[resp.responsavel] || COLORS[index % COLORS.length];
             return (
                 <div key={resp.id} className={`flex items-center justify-between px-2.5 py-1.5 rounded-md text-sm font-semibold truncate ${color.bg} ${color.text}`}>
                     <span title={resp.responsavel}>{shortenName(resp.responsavel)}</span>
@@ -170,14 +171,32 @@ const EditablePautaResponsibles: React.FC<{
   );
 };
 
-// FIX: Added missing props type definition for the component.
 interface MinutesDisplayProps {
     ata: AtaData | null;
     setAta: React.Dispatch<React.SetStateAction<AtaData | null>>;
     isEditing: boolean;
+    invalidDeadlineFields: Set<string>;
 }
 
-const MinutesDisplay: React.FC<MinutesDisplayProps> = ({ ata, setAta, isEditing }) => {
+const MinutesDisplay: React.FC<MinutesDisplayProps> = ({ ata, setAta, isEditing, invalidDeadlineFields }) => {
+    const responsibleColorMap = useMemo(() => {
+        if (!ata) return {};
+        
+        const allResponsibleNames = new Set<string>();
+        ata.pauta.forEach(item => {
+            item.responsaveis.forEach(resp => {
+                allResponsibleNames.add(resp.responsavel);
+            });
+        });
+
+        const map: Record<string, typeof COLORS[number]> = {};
+        Array.from(allResponsibleNames).sort().forEach((name, index) => {
+            map[name] = COLORS[index % COLORS.length];
+        });
+
+        return map;
+    }, [ata]);
+
     // --- Edit Handlers ---
     const handleAtaChange = useCallback(<K extends keyof AtaData>(field: K, value: AtaData[K]) => {
         if (!ata) return;
@@ -352,23 +371,27 @@ const MinutesDisplay: React.FC<MinutesDisplayProps> = ({ ata, setAta, isEditing 
                                         responsaveis={item.responsaveis}
                                         participants={ata.participantes}
                                         onChange={v => handlePautaChange(index, 'responsaveis', v)}
+                                        colorMap={responsibleColorMap}
                                     />
                                 </td>
                                 <td className="p-2 border dark:border-gray-600 align-top">
                                     <div className="space-y-2">
                                         {item.responsaveis.map((resp, respIndex) => {
-                                            const color = COLORS[respIndex % COLORS.length];
+                                            const color = responsibleColorMap[resp.responsavel] || COLORS[respIndex % COLORS.length];
                                             const handlePrazoChangeForThis = (newPrazo: string | null) => {
                                                 const newResponsaveis = item.responsaveis.map(r => r.id === resp.id ? { ...r, prazo: newPrazo } : r);
                                                 handlePautaChange(index, 'responsaveis', newResponsaveis);
                                             };
+                                            const fieldKey = `${index}-${resp.id}`;
+                                            const isInvalid = invalidDeadlineFields.has(fieldKey);
+
                                             return (
                                                 <input
                                                     key={resp.id}
                                                     type="date"
                                                     value={convertToInputDate(resp.prazo)}
                                                     onChange={e => handlePrazoChangeForThis(convertToDisplayDate(e.target.value))}
-                                                    className={`p-1 rounded-md border text-sm w-full h-[38px] ${color.bg} ${color.text} ${color.border} focus:outline-none focus:ring-1 focus:ring-blue-500`}
+                                                    className={`p-1 rounded-md border text-sm w-full h-[38px] ${color.bg} ${color.text} ${isInvalid ? 'border-red-500 ring-2 ring-red-500/50' : color.border} focus:outline-none focus:ring-1 focus:ring-blue-500`}
                                                 />
                                             );
                                         })}
@@ -380,7 +403,7 @@ const MinutesDisplay: React.FC<MinutesDisplayProps> = ({ ata, setAta, isEditing 
                                 <td className="p-2 border dark:border-gray-600 align-top">
                                     <div className="space-y-1">
                                         {item.responsaveis.map((resp, respIndex) => {
-                                            const color = COLORS[respIndex % COLORS.length];
+                                            const color = responsibleColorMap[resp.responsavel] || COLORS[respIndex % COLORS.length];
                                             return (
                                                 <div key={resp.id} title={resp.responsavel} className={`flex items-center justify-center h-[30px] px-2.5 py-1 rounded-md text-sm font-semibold truncate ${color.bg} ${color.text}`}>
                                                     {shortenName(resp.responsavel)}
@@ -392,7 +415,7 @@ const MinutesDisplay: React.FC<MinutesDisplayProps> = ({ ata, setAta, isEditing 
                                 <td className="p-2 border dark:border-gray-600 align-top">
                                     <div className="space-y-1">
                                         {item.responsaveis.map((resp, respIndex) => {
-                                            const color = COLORS[respIndex % COLORS.length];
+                                            const color = responsibleColorMap[resp.responsavel] || COLORS[respIndex % COLORS.length];
                                             return (
                                                 <div key={resp.id} className={`flex items-center justify-center h-[30px] px-2.5 py-1 rounded-md text-sm font-semibold truncate ${color.bg} ${color.text}`}>
                                                     {resp.prazo || 'N/A'}
