@@ -1,4 +1,5 @@
 
+
 // Fix: Switched to Firebase v8/compat API to resolve module export errors.
 // The errors suggest that the installed Firebase version doesn't match the v9 modular syntax used previously.
 // The compat library provides the familiar v8 API surface while using the v9 SDK under the hood.
@@ -27,16 +28,16 @@ export const db = firebase.firestore();
 const atasCollectionRef = db.collection("atas");
 
 /**
- * Saves a new AtaData object to the 'atas' collection in Firestore.
+ * Saves or updates an AtaData object in the 'atas' collection in Firestore.
+ * If the object has an 'id', it updates the existing document. Otherwise, it creates a new one.
  * @param ataData The meeting minutes data to save.
- * @returns The ID of the newly created document.
+ * @returns The ID of the saved/updated document.
  */
 export const saveAtaToFirestore = async (ataData: AtaData): Promise<string> => {
     try {
-        // We remove the ID before saving to avoid storing it redundantly inside the document
         const { id, ...dataToSave } = ataData;
         
-        // Clean up the pauta items to ensure they match the new data structure
+        // Clean up pauta items to ensure they match the current data structure
         if (dataToSave.pauta) {
             dataToSave.pauta = dataToSave.pauta.map(item => {
                 const { prazo, ...restOfItem } = item; // Remove the top-level 'prazo'
@@ -44,11 +45,20 @@ export const saveAtaToFirestore = async (ataData: AtaData): Promise<string> => {
             });
         }
 
-        const docRef = await atasCollectionRef.add(dataToSave);
-        console.log("Document written with ID: ", docRef.id);
-        return docRef.id;
+        if (id) {
+            // If ID exists, update the document
+            const docRef = atasCollectionRef.doc(id);
+            await docRef.set(dataToSave);
+            console.log("Document updated with ID: ", id);
+            return id;
+        } else {
+            // Otherwise, create a new document
+            const docRef = await atasCollectionRef.add(dataToSave);
+            console.log("Document written with ID: ", docRef.id);
+            return docRef.id;
+        }
     } catch (e) {
-        console.error("Error adding document: ", e);
+        console.error("Error saving document: ", e);
         throw new Error("Failed to save data to Firestore.");
     }
 };
@@ -85,5 +95,21 @@ export const loadAtasFromFirestore = async (): Promise<AtaData[]> => {
     } catch (e) {
         console.error("Error getting documents: ", e);
         throw new Error("Failed to load data from Firestore.");
+    }
+};
+
+/**
+ * Deletes a document from the 'atas' collection in Firestore.
+ * @param id The ID of the document to delete.
+ */
+export const deleteAtaFromFirestore = async (id: string): Promise<void> => {
+    try {
+        if (!id) throw new Error("Document ID is required for deletion.");
+        const docRef = atasCollectionRef.doc(id);
+        await docRef.delete();
+        console.log("Document with ID deleted: ", id);
+    } catch (e) {
+        console.error("Error deleting document: ", e);
+        throw new Error("Failed to delete data from Firestore.");
     }
 };

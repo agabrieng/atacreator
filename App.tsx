@@ -3,7 +3,7 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import type { AtaData, AdminSettings, Participant, PautaItem } from './types';
 import { generateAtaData } from './services/geminiService';
-import { saveAtaToFirestore, loadAtasFromFirestore } from './services/firebaseService';
+import { saveAtaToFirestore, loadAtasFromFirestore, deleteAtaFromFirestore } from './services/firebaseService';
 import { exportToDocx, exportToPdf } from './services/exportService';
 import Header from './components/Header';
 import InputForm from './components/InputForm';
@@ -52,7 +52,6 @@ const App: React.FC = () => {
   const [contrato, setContrato] = useState('');
   const [assunto, setAssunto] = useState('');
   const [local, setLocal] = useState('');
-  const [participantes, setParticipantes] = useState<Participant[]>([]);
   const [vttContent, setVttContent] = useState<string>('');
   
   const [ata, setAta] = useState<AtaData | null>(null);
@@ -60,6 +59,8 @@ const App: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [showClearConfirmation, setShowClearConfirmation] = useState(false);
   const [showOverwriteConfirmation, setShowOverwriteConfirmation] = useState(false);
+  const [showSaveReminder, setShowSaveReminder] = useState(false);
+  const [originalLoadedAta, setOriginalLoadedAta] = useState<AtaData | null>(null);
 
 
   // State for the action toolbar
@@ -74,6 +75,10 @@ const App: React.FC = () => {
   const [isSavedAtasLoading, setIsSavedAtasLoading] = useState(false);
   const [showLoadPanel, setShowLoadPanel] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
+
+  // State for deleting atas
+  const [showDeleteConfirmation, setShowDeleteConfirmation] = useState(false);
+  const [ataToDelete, setAtaToDelete] = useState<AtaData | null>(null);
 
 
   useEffect(() => {
@@ -146,31 +151,27 @@ const App: React.FC = () => {
     setIsLoading(true);
     setError(null);
     setAta(null);
+    setOriginalLoadedAta(null); // Reset loaded ata state
     setIsEditing(false); // Reset editing mode on new generation
 
     try {
       const generatedPart = await generateAtaData(vttContent, titulo);
       
-      const existingParticipantNames = new Set(participantes.map(p => p.nome.toLowerCase().trim()));
-      const updatedParticipants = [...participantes];
-
+      const updatedParticipants: Participant[] = [];
       if (generatedPart.participantes) {
         generatedPart.participantes.forEach(geminiParticipant => {
             const trimmedName = geminiParticipant.nome.trim();
-            if (trimmedName && !existingParticipantNames.has(trimmedName.toLowerCase())) {
+            if (trimmedName) {
                 updatedParticipants.push({
-                    id: `${Date.now()}-${trimmedName}`,
+                    id: `${Date.now()}-${Math.random()}-${trimmedName}`,
                     nome: trimmedName,
                     empresa: geminiParticipant.empresa || '',
                     email: '',
                     status: 'P',
                 });
-                existingParticipantNames.add(trimmedName.toLowerCase());
             }
         });
       }
-
-      setParticipantes(updatedParticipants);
 
       // Transform the pauta from Gemini's output to the application's data structure
       const finalPauta: PautaItem[] = generatedPart.pauta.map(item => ({
@@ -217,7 +218,7 @@ const App: React.FC = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [vttContent, titulo, empreendimento, area, contrato, assunto, local, participantes, adminSettings]);
+  }, [vttContent, titulo, empreendimento, area, contrato, assunto, local, adminSettings]);
   
   const handleGenerateClick = () => {
     if (ata) {
@@ -239,9 +240,9 @@ const App: React.FC = () => {
     setContrato('');
     setAssunto('');
     setLocal('');
-    setParticipantes([]);
     setVttContent('');
     setAta(null);
+    setOriginalLoadedAta(null); // Reset loaded ata state
     setError(null);
     setIsEditing(false); // Reset editing state
   }, []);
@@ -257,7 +258,12 @@ const App: React.FC = () => {
     setSaveSuccess(false);
     try {
       const docId = await saveAtaToFirestore(ata);
-      setAta(prevAta => prevAta ? { ...prevAta, id: docId } : null);
+      const savedAta = { ...ata, id: docId };
+      setAta(savedAta);
+      // If we just updated a loaded ata, update the original state to prevent repeated warnings
+      if (originalLoadedAta) {
+          setOriginalLoadedAta(savedAta);
+      }
       setSaveSuccess(true);
       setTimeout(() => setSaveSuccess(false), 2500);
     } catch (error) {
@@ -266,7 +272,7 @@ const App: React.FC = () => {
     } finally {
       setIsSaving(false);
     }
-  }, [ata]);
+  }, [ata, originalLoadedAta]);
   
   const handleOpenLoadPanel = useCallback(async () => {
     setShowLoadPanel(true);
@@ -290,16 +296,39 @@ const App: React.FC = () => {
 
   const handleSelectSavedAta = useCallback((selectedAta: AtaData) => {
     setAta(selectedAta);
+    setOriginalLoadedAta(selectedAta); // Keep a copy for change detection
     setEmpreendimento(selectedAta.empreendimento || '');
     setArea(selectedAta.area || '');
     setTitulo(selectedAta.titulo || '');
     setContrato(selectedAta.contrato || '');
     setAssunto(selectedAta.assunto || '');
     setLocal(selectedAta.local || '');
-    setParticipantes(selectedAta.participantes || []);
     setVttContent('');
     setShowLoadPanel(false);
+    setIsEditing(true); // Abrir em modo de edição
   }, []);
+
+  const handleDeleteClick = (ata: AtaData) => {
+    setAtaToDelete(ata);
+    setShowDeleteConfirmation(true);
+  };
+
+  const onConfirmDelete = async () => {
+    if (!ataToDelete || !ataToDelete.id) return;
+    try {
+      await deleteAtaFromFirestore(ataToDelete.id);
+      setSavedAtas(prev => prev.filter(a => a.id !== ataToDelete.id));
+      if (ata?.id === ataToDelete.id) {
+        handleClear();
+      }
+    } catch (error) {
+      console.error("Failed to delete ata:", error);
+      alert("Ocorreu um erro ao excluir a ata.");
+    } finally {
+      setShowDeleteConfirmation(false);
+      setAtaToDelete(null);
+    }
+  };
   
   const handleCopy = useCallback(() => {
       if (!ata) return;
@@ -307,6 +336,16 @@ const App: React.FC = () => {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
   }, [ata]);
+
+  const handleToggleEditing = () => {
+      // When finishing editing, check if a loaded ata has been modified
+      if (isEditing && originalLoadedAta) {
+          if (JSON.stringify(ata) !== JSON.stringify(originalLoadedAta)) {
+              setShowSaveReminder(true);
+          }
+      }
+      setIsEditing(!isEditing);
+  };
 
 
   return (
@@ -324,12 +363,12 @@ const App: React.FC = () => {
             contrato={contrato} setContrato={setContrato}
             assunto={assunto} setAssunto={setAssunto}
             local={local} setLocal={setLocal}
-            participantes={participantes} setParticipantes={setParticipantes}
             vttContent={vttContent} setVttContent={setVttContent}
             onGenerate={handleGenerateClick}
             onClear={() => setShowClearConfirmation(true)}
             isLoading={isLoading}
             isEditing={isEditing}
+            onOpenLoadPanel={handleOpenLoadPanel}
           />
           <div className="relative lg:sticky top-8 bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 min-h-[calc(100vh-10rem)]">
             {isLoading && <Loader />}
@@ -345,7 +384,7 @@ const App: React.FC = () => {
                 {ata && (
                   <div className="flex flex-wrap items-center gap-2 mb-4 pb-4 border-b border-gray-200 dark:border-gray-700">
                      <ActionButton
-                        onClick={() => setIsEditing(!isEditing)}
+                        onClick={handleToggleEditing}
                         title={isEditing ? "Concluir Edição" : "Editar Ata"}
                         className={isEditing ? 'bg-green-600 text-white hover:bg-green-700 focus:ring-green-500' : 'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-200 border border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600 focus:ring-blue-500'}
                     >
@@ -369,15 +408,6 @@ const App: React.FC = () => {
                     >
                         {saveSuccess ? <CheckIcon className="w-5 h-5 text-green-500" /> : <UploadCloudIcon className="w-5 h-5" />}
                         <span>{isSaving ? 'Salvando...' : 'Salvar'}</span>
-                    </ActionButton>
-                    <ActionButton
-                        onClick={handleOpenLoadPanel}
-                        disabled={isEditing}
-                        title={isEditing ? "Conclua a edição para poder carregar" : "Carregar Ata da Nuvem"}
-                        className="bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-200 border border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600 focus:ring-blue-500"
-                    >
-                        <DownloadCloudIcon className="w-5 h-5" />
-                        <span>Carregar</span>
                     </ActionButton>
                     <div className="flex-grow"></div>
                     <ActionButton
@@ -413,6 +443,7 @@ const App: React.FC = () => {
         atas={savedAtas}
         onClose={() => setShowLoadPanel(false)}
         onSelect={handleSelectSavedAta}
+        onDelete={handleDeleteClick}
       />
       <ConfirmationDialog
         isOpen={showClearConfirmation}
@@ -431,6 +462,31 @@ const App: React.FC = () => {
         title="Gerar Nova Ata"
       >
         Você tem certeza que deseja gerar uma nova ata? A ata atual será descartada e todas as alterações não salvas serão perdidas.
+      </ConfirmationDialog>
+      <ConfirmationDialog
+        isOpen={showSaveReminder}
+        onClose={() => setShowSaveReminder(false)}
+        onConfirm={() => setShowSaveReminder(false)}
+        title="Salvar Alterações"
+        icon="info"
+        confirmText="Entendido"
+        hideCancel={true}
+      >
+        Você fez alterações nesta ata. Para mantê-las, clique no botão "Salvar".
+        As alterações não salvas serão perdidas ao gerar ou carregar uma nova ata.
+      </ConfirmationDialog>
+      <ConfirmationDialog
+        isOpen={showDeleteConfirmation}
+        onClose={() => setShowDeleteConfirmation(false)}
+        onConfirm={onConfirmDelete}
+        title="Confirmar Exclusão"
+        icon="alert"
+        confirmText="Excluir"
+      >
+        Tem certeza de que deseja excluir permanentemente a ata{' '}
+        <strong>"{ataToDelete?.titulo}"</strong> de <strong>{ataToDelete?.data}</strong>?
+        <br/><br/>
+        Esta ação não pode ser desfeita.
       </ConfirmationDialog>
     </div>
   );
