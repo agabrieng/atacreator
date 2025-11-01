@@ -1,4 +1,5 @@
 
+
 import { initializeApp } from "firebase/app";
 import { 
     getFirestore, 
@@ -10,28 +11,32 @@ import {
     updateDoc, 
     deleteDoc, 
     query, 
-    orderBy 
+    orderBy,
+    type Firestore
 } from "firebase/firestore";
 import type { AtaData, Empreendimento } from '../types';
 
-// Your web app's Firebase configuration
-const firebaseConfig = {
-  apiKey: process.env.API_KEY,
-  authDomain: "atacreator-79583.firebaseapp.com",
-  projectId: "atacreator-79583",
-  storageBucket: "atacreator-79583.appspot.com",
-  messagingSenderId: "202196913223",
-  appId: "1:202196913223:web:1e716de3d93aeace4af562",
-  measurementId: "G-7H0QDPT0FD"
+// Lazy initialization of Firebase
+let dbInstance: Firestore | null = null;
+
+const getDb = (): Firestore => {
+    if (!dbInstance) {
+        // Your web app's Firebase configuration
+        const firebaseConfig = {
+          apiKey: process.env.API_KEY,
+          authDomain: "atacreator-79583.firebaseapp.com",
+          projectId: "atacreator-79583",
+          storageBucket: "atacreator-79583.appspot.com",
+          messagingSenderId: "202196913223",
+          appId: "1:202196913223:web:1e716de3d93aeace4af562",
+          measurementId: "G-7H0QDPT0FD"
+        };
+        const app = initializeApp(firebaseConfig);
+        dbInstance = getFirestore(app);
+    }
+    return dbInstance;
 };
 
-
-// Initialize Firebase
-const app = initializeApp(firebaseConfig);
-export const db = getFirestore(app);
-
-const atasCollectionRef = collection(db, "atas");
-const empreendimentosCollectionRef = collection(db, "empreendimentos");
 
 /**
  * Saves or updates an AtaData object in the 'atas' collection in Firestore.
@@ -41,6 +46,8 @@ const empreendimentosCollectionRef = collection(db, "empreendimentos");
  */
 export const saveAtaToFirestore = async (ataData: AtaData): Promise<string> => {
     try {
+        const db = getDb();
+        const atasCollectionRef = collection(db, "atas");
         const { id, ...dataToSave } = ataData;
         
         // Clean up pauta items to ensure they match the current data structure
@@ -75,6 +82,8 @@ export const saveAtaToFirestore = async (ataData: AtaData): Promise<string> => {
  */
 export const loadAtasFromFirestore = async (): Promise<AtaData[]> => {
     try {
+        const db = getDb();
+        const atasCollectionRef = collection(db, "atas");
         const querySnapshot = await getDocs(atasCollectionRef);
         const atas: AtaData[] = [];
         querySnapshot.forEach((doc) => {
@@ -110,6 +119,8 @@ export const loadAtasFromFirestore = async (): Promise<AtaData[]> => {
  */
 export const deleteAtaFromFirestore = async (id: string): Promise<void> => {
     try {
+        const db = getDb();
+        const atasCollectionRef = collection(db, "atas");
         if (!id) throw new Error("Document ID is required for deletion.");
         const docRef = doc(atasCollectionRef, id);
         await deleteDoc(docRef);
@@ -126,6 +137,8 @@ export const deleteAtaFromFirestore = async (id: string): Promise<void> => {
  */
 export const getEmpreendimentos = async (): Promise<Empreendimento[]> => {
     try {
+        const db = getDb();
+        const empreendimentosCollectionRef = collection(db, "empreendimentos");
         const q = query(empreendimentosCollectionRef, orderBy("name", "asc"));
         const querySnapshot = await getDocs(q);
         return querySnapshot.docs.map(doc => ({
@@ -147,6 +160,8 @@ export const getEmpreendimentos = async (): Promise<Empreendimento[]> => {
  */
 export const addEmpreendimento = async (name: string, contrato: string): Promise<string> => {
     try {
+        const db = getDb();
+        const empreendimentosCollectionRef = collection(db, "empreendimentos");
         const docRef = await addDoc(empreendimentosCollectionRef, { name, contrato });
         return docRef.id;
     } catch (e) {
@@ -163,6 +178,8 @@ export const addEmpreendimento = async (name: string, contrato: string): Promise
  */
 export const updateEmpreendimento = async (id: string, name: string, contrato: string): Promise<void> => {
     try {
+        const db = getDb();
+        const empreendimentosCollectionRef = collection(db, "empreendimentos");
         const docRef = doc(empreendimentosCollectionRef, id);
         await updateDoc(docRef, { name, contrato });
     } catch (e) {
@@ -177,6 +194,8 @@ export const updateEmpreendimento = async (id: string, name: string, contrato: s
  */
 export const deleteEmpreendimento = async (id: string): Promise<void> => {
     try {
+        const db = getDb();
+        const empreendimentosCollectionRef = collection(db, "empreendimentos");
         const docRef = doc(empreendimentosCollectionRef, id);
         await deleteDoc(docRef);
     } catch (e) {

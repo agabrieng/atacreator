@@ -1,10 +1,11 @@
 
 
+
 import React, { useState, useCallback, useEffect } from 'react';
 import type { AtaData, AdminSettings, Participant, PautaItem, Empreendimento } from './types';
 import { generateAtaData } from './services/geminiService';
 import { saveAtaToFirestore, loadAtasFromFirestore, deleteAtaFromFirestore, getEmpreendimentos, addEmpreendimento, updateEmpreendimento, deleteEmpreendimento } from './services/firebaseService';
-import { exportToDocx, exportToPdf } from './services/exportService';
+import { exportToPdf } from './services/exportService';
 import Header from './components/Header';
 import InputForm from './components/InputForm';
 import MinutesDisplay from './components/MinutesDisplay';
@@ -12,7 +13,7 @@ import Loader from './components/Loader';
 import ConfirmationDialog from './components/ConfirmationDialog';
 import SavedAtasPanel from './components/SavedAtasPanel';
 import ProjectManagementPanel from './components/ProjectManagementPanel';
-import { AlertTriangleIcon, EditIcon, CheckIcon, CopyIcon, UploadCloudIcon, DownloadCloudIcon, FileWordIcon, FilePdfIcon, ExternalLinkIcon } from './components/icons';
+import { AlertTriangleIcon, EditIcon, CheckIcon, CopyIcon, UploadCloudIcon, DownloadCloudIcon, FilePdfIcon, ExternalLinkIcon } from './components/icons';
 
 const DEFAULT_COMPANY_NAME = "Minha Empresa";
 const DEFAULT_SETTINGS: AdminSettings = {
@@ -568,15 +569,6 @@ const App: React.FC = () => {
                         <span>{isSaving ? 'Salvando...' : 'Salvar'}</span>
                     </ActionButton>
                     <div className="flex-grow"></div>
-                    <ActionButton
-                        onClick={() => exportToDocx(ata)}
-                        disabled={isEditing || !isExportReady}
-                        title={isEditing ? "Conclua a edição para exportar" : (isExportReady ? "Exportar para DOCX" : "Aguardando bibliotecas de exportação...")}
-                        className="bg-blue-600 text-white hover:bg-blue-700 focus:ring-blue-500"
-                    >
-                       <FileWordIcon className="w-5 h-5" />
-                       <span>DOCX</span>
-                    </ActionButton>
                     <ActionButton
                         onClick={() => exportToPdf(ata)}
                         disabled={isEditing || !isExportReady}
