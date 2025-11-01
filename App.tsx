@@ -1,7 +1,7 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import type { AtaData, AdminSettings, Participant, PautaItem, Empreendimento } from './types';
 import { generateAtaData } from './services/geminiService';
-import { saveAtaToLocalStorage, loadAtasFromLocalStorage, deleteAtaFromLocalStorage, getEmpreendimentos, addEmpreendimento, updateEmpreendimento, deleteEmpreendimento } from './services/localStorageService';
+import { saveAtaToFirebase, loadAtasFromFirebase, deleteAtaFromFirebase, getEmpreendimentos, addEmpreendimento, updateEmpreendimento, deleteEmpreendimento } from './services/firebaseService';
 import { exportToPdf } from './services/exportService';
 import Header from './components/Header';
 import InputForm from './components/InputForm';
@@ -10,7 +10,7 @@ import Loader from './components/Loader';
 import ConfirmationDialog from './components/ConfirmationDialog';
 import SavedAtasPanel from './components/SavedAtasPanel';
 import ProjectManagementPanel from './components/ProjectManagementPanel';
-import { AlertTriangleIcon, EditIcon, CheckIcon, CopyIcon, SaveIcon, DownloadCloudIcon, FilePdfIcon } from './components/icons';
+import { AlertTriangleIcon, EditIcon, CheckIcon, CopyIcon, UploadCloudIcon, DownloadCloudIcon, FilePdfIcon } from './components/icons';
 
 const DEFAULT_COMPANY_NAME = "Minha Empresa";
 const DEFAULT_SETTINGS: AdminSettings = {
@@ -122,8 +122,8 @@ const App: React.FC = () => {
             const loadedEmpreendimentos = await getEmpreendimentos();
             setEmpreendimentos(loadedEmpreendimentos);
         } catch (error: any) {
-            console.error("Failed to load empreendimentos from localStorage", error);
-            setError("Falha ao carregar a lista de empreendimentos do armazenamento local.");
+            console.error("Failed to load empreendimentos from Firebase", error);
+            setError(`Falha ao carregar a lista de empreendimentos do Firebase: ${error.message}`);
         } finally {
             setIsProjectsLoading(false);
         }
@@ -186,7 +186,7 @@ const App: React.FC = () => {
         setEmpreendimentos(prev => [...prev, newProject].sort((a, b) => a.name.localeCompare(b.name)));
     } catch (error) {
         console.error("Failed to add project:", error);
-        alert("Falha ao adicionar empreendimento.");
+        alert("Falha ao adicionar empreendimento no Firebase.");
     }
   };
 
@@ -196,7 +196,7 @@ const App: React.FC = () => {
         setEmpreendimentos(prev => prev.map(p => p.id === id ? { ...p, name: newName, contrato: newContrato } : p).sort((a, b) => a.name.localeCompare(b.name)));
     } catch (error) {
         console.error("Failed to update project:", error);
-        alert("Falha ao atualizar empreendimento.");
+        alert("Falha ao atualizar empreendimento no Firebase.");
     }
   };
   
@@ -214,7 +214,7 @@ const App: React.FC = () => {
         }
     } catch (error) {
         console.error("Failed to delete project:", error);
-        alert("Falha ao excluir empreendimento.");
+        alert("Falha ao excluir empreendimento do Firebase.");
     }
   };
 
@@ -353,7 +353,7 @@ const App: React.FC = () => {
     setIsSaving(true);
     setSaveSuccess(false);
     try {
-      const docId = await saveAtaToLocalStorage(ata);
+      const docId = await saveAtaToFirebase(ata);
       const savedAta = { ...ata, id: docId };
       setAta(savedAta);
       // If we just updated a loaded ata, update the original state to prevent repeated warnings
@@ -363,8 +363,8 @@ const App: React.FC = () => {
       setSaveSuccess(true);
       setTimeout(() => setSaveSuccess(false), 2500);
     } catch (error) {
-      console.error("Erro ao salvar a ata no localStorage:", error);
-      alert("Ocorreu um erro ao salvar a ata. Verifique o console para mais detalhes.");
+      console.error("Erro ao salvar a ata no Firebase:", error);
+      alert("Ocorreu um erro ao salvar a ata no Firebase. Verifique o console para mais detalhes.");
     } finally {
       setIsSaving(false);
     }
@@ -375,16 +375,13 @@ const App: React.FC = () => {
     setIsSavedAtasLoading(true);
     setLoadError(null);
     try {
-        const loadedAtas = await loadAtasFromLocalStorage();
-        loadedAtas.sort((a, b) => {
-            const dateA = a.data.split('/').reverse().join('');
-            const dateB = b.data.split('/').reverse().join('');
-            return dateB.localeCompare(dateA);
-        });
+        const loadedAtas = await loadAtasFromFirebase();
+        // Sorting can be done here if a consistent date/time field is available
+        // For now, Firebase returns them ordered by last update
         setSavedAtas(loadedAtas);
-    } catch (error) {
-        console.error("Failed to load atas from localStorage:", error);
-        setLoadError("Não foi possível carregar as atas. Verifique se há dados salvos no seu navegador.");
+    } catch (error: any) {
+        console.error("Failed to load atas from Firebase:", error);
+        setLoadError(`Não foi possível carregar as atas do Firebase: ${error.message}`);
     } finally {
         setIsSavedAtasLoading(false);
     }
@@ -413,14 +410,14 @@ const App: React.FC = () => {
   const onConfirmDelete = async () => {
     if (!ataToDelete || !ataToDelete.id) return;
     try {
-      await deleteAtaFromLocalStorage(ataToDelete.id);
+      await deleteAtaFromFirebase(ataToDelete.id);
       setSavedAtas(prev => prev.filter(a => a.id !== ataToDelete.id));
       if (ata?.id === ataToDelete.id) {
         handleClear();
       }
     } catch (error) {
       console.error("Failed to delete ata:", error);
-      alert("Ocorreu um erro ao excluir a ata.");
+      alert("Ocorreu um erro ao excluir a ata do Firebase.");
     } finally {
       setShowDeleteConfirmation(false);
       setAtaToDelete(null);
@@ -534,11 +531,11 @@ const App: React.FC = () => {
                     <ActionButton
                         onClick={handleSave}
                         disabled={isEditing || isSaving}
-                        title={isEditing ? "Conclua a edição para poder salvar" : "Salvar localmente"}
+                        title={isEditing ? "Conclua a edição para poder salvar" : "Salvar na nuvem"}
                         className={`bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-200 border border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600 focus:ring-blue-500 ${saveSuccess ? 'border-green-500' : ''}`}
                     >
-                        {saveSuccess ? <CheckIcon className="w-5 h-5 text-green-500" /> : <SaveIcon className="w-5 h-5" />}
-                        <span>{isSaving ? 'Salvando...' : 'Salvar'}</span>
+                        {saveSuccess ? <CheckIcon className="w-5 h-5 text-green-500" /> : <UploadCloudIcon className="w-5 h-5" />}
+                        <span>{isSaving ? 'Salvando...' : 'Salvar na Nuvem'}</span>
                     </ActionButton>
                     <div className="flex-grow"></div>
                     <ActionButton
@@ -602,7 +599,7 @@ const App: React.FC = () => {
         confirmText="Entendido"
         hideCancel={true}
       >
-        Você fez alterações nesta ata. Para mantê-las, clique no botão "Salvar".
+        Você fez alterações nesta ata. Para mantê-las, clique no botão "Salvar na Nuvem".
         As alterações não salvas serão perdidas ao gerar ou carregar uma nova ata.
       </ConfirmationDialog>
       <ConfirmationDialog

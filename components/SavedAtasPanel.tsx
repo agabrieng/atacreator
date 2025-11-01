@@ -71,7 +71,7 @@ const SavedAtasPanel: React.FC<SavedAtasPanelProps> = ({
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex justify-between items-center p-4 border-b border-gray-200 dark:border-gray-700">
-          <h2 className="text-xl font-bold text-gray-800 dark:text-gray-100">Carregar Ata Salva</h2>
+          <h2 className="text-xl font-bold text-gray-800 dark:text-gray-100">Carregar Ata da Nuvem</h2>
           <button
             onClick={onClose}
             className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
@@ -84,7 +84,7 @@ const SavedAtasPanel: React.FC<SavedAtasPanelProps> = ({
           {isLoading && (
             <div className="flex flex-col items-center justify-center h-full">
               <div className="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
-              <p className="mt-4 text-gray-600 dark:text-gray-300">Carregando atas salvas...</p>
+              <p className="mt-4 text-gray-600 dark:text-gray-300">Carregando atas da nuvem...</p>
             </div>
           )}
 
@@ -100,7 +100,7 @@ const SavedAtasPanel: React.FC<SavedAtasPanelProps> = ({
               <div className="flex flex-col items-center justify-center h-full text-center text-gray-500 dark:text-gray-400">
                 <FileTextIcon className="w-16 h-16 mb-4 text-gray-300 dark:text-gray-600" />
                 <h3 className="text-lg font-semibold">Nenhuma Ata Encontrada</h3>
-                <p className="max-w-md mt-1 text-sm">Parece que você ainda não salvou nenhuma ata.</p>
+                <p className="max-w-md mt-1 text-sm">Parece que você ainda não salvou nenhuma ata na nuvem.</p>
               </div>
           )}
 
