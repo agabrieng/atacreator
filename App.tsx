@@ -88,6 +88,9 @@ const App: React.FC = () => {
   const [empreendimentos, setEmpreendimentos] = useState<Empreendimento[]>([]);
   const [isProjectsLoading, setIsProjectsLoading] = useState(true);
   const [isProjectPanelOpen, setIsProjectPanelOpen] = useState(false);
+  
+  // State for collapsible form
+  const [isFormCollapsed, setIsFormCollapsed] = useState(false);
 
 
   useEffect(() => {
@@ -313,6 +316,7 @@ const App: React.FC = () => {
       };
 
       setAta(finalAta);
+      setIsFormCollapsed(true);
 
     } catch (err) {
       console.error(err);
@@ -357,6 +361,7 @@ const App: React.FC = () => {
     setIndexErrorUrl(null);
     setIsEditing(false); // Reset editing state
     setInvalidDeadlineFields(new Set()); // Clear validation state
+    setIsFormCollapsed(false);
   }, []);
   
   const onConfirmClear = () => {
@@ -418,6 +423,7 @@ const App: React.FC = () => {
     setVttContent('');
     setShowLoadPanel(false);
     setIsEditing(true); // Abrir em modo de edição
+    setIsFormCollapsed(true);
   }, []);
 
   const handleDeleteClick = (ata: AtaData) => {
@@ -489,27 +495,32 @@ const App: React.FC = () => {
     <div className="min-h-screen bg-gray-50 text-gray-800 dark:bg-gray-900 dark:text-gray-200 font-sans">
       <Header />
       <main className="container mx-auto p-4 md:p-8">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
-          <InputForm
-            companyProfiles={companyProfiles}
-            currentCompanyName={currentCompanyName}
-            onSettingsSave={handleSettingsSave}
-            empreendimento={empreendimento} setEmpreendimento={setEmpreendimento}
-            empreendimentos={empreendimentos}
-            isProjectsLoading={isProjectsLoading}
-            onOpenProjectPanel={() => setIsProjectPanelOpen(true)}
-            area={area} setArea={setArea}
-            titulo={titulo} setTitulo={setTitulo}
-            assunto={assunto} setAssunto={setAssunto}
-            local={local} setLocal={setLocal}
-            vttContent={vttContent} setVttContent={setVttContent}
-            onGenerate={handleGenerateClick}
-            onClear={() => setShowClearConfirmation(true)}
-            isLoading={isLoading}
-            isEditing={isEditing}
-            onOpenLoadPanel={handleOpenLoadPanel}
-          />
-          <div className="relative lg:sticky top-8 bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 min-h-[calc(100vh-10rem)]">
+        <div className={`grid grid-cols-1 ${ata ? `lg:grid lg:grid-cols-[${isFormCollapsed ? 'auto_1fr' : 'minmax(450px,_5fr)_7fr'}]` : 'lg:grid-cols-2'} gap-8 items-start`}>
+            <div className="transition-all duration-300 ease-in-out">
+                <InputForm
+                    companyProfiles={companyProfiles}
+                    currentCompanyName={currentCompanyName}
+                    onSettingsSave={handleSettingsSave}
+                    empreendimento={empreendimento} setEmpreendimento={setEmpreendimento}
+                    empreendimentos={empreendimentos}
+                    isProjectsLoading={isProjectsLoading}
+                    onOpenProjectPanel={() => setIsProjectPanelOpen(true)}
+                    area={area} setArea={setArea}
+                    titulo={titulo} setTitulo={setTitulo}
+                    assunto={assunto} setAssunto={setAssunto}
+                    local={local} setLocal={setLocal}
+                    vttContent={vttContent} setVttContent={setVttContent}
+                    onGenerate={handleGenerateClick}
+                    onClear={() => setShowClearConfirmation(true)}
+                    isLoading={isLoading}
+                    isEditing={isEditing}
+                    onOpenLoadPanel={handleOpenLoadPanel}
+                    isAtaGenerated={!!ata}
+                    isCollapsed={isFormCollapsed && !!ata}
+                    onToggleCollapse={() => setIsFormCollapsed(!isFormCollapsed)}
+                />
+            </div>
+          <div className="relative lg:sticky top-8 bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 min-h-[calc(100vh-10rem)] transition-all duration-300 ease-in-out">
             {isLoading && <Loader />}
             {error && (
               <div className="flex flex-col items-center justify-center h-full text-center p-4">

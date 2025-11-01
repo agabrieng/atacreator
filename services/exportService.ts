@@ -1,5 +1,3 @@
-
-
 import {
   AlignmentType, Document, Packer, Paragraph, Table, TableCell, TableRow, WidthType, VerticalAlign, HeadingLevel, TextRun, ImageRun, Header, PageNumber
 } from 'docx';
@@ -48,8 +46,10 @@ export const exportToDocx = async (ata: AtaData): Promise<void> => {
                 children: [
                     new TableCell({
                         children: [logoBuffer ? new Paragraph({
-                            // Fix: Use 'buffer' instead of 'data' for ImageRun property
-                            children: [new ImageRun({ buffer: logoBuffer, transformation: { width: 120, height: 45 }})],
+                            // FIX: The `ImageRun` constructor from the `docx` library has an unstable API via CDN. It may expect 'data' or 'buffer'.
+                            // FIX: Changed 'data' back to 'buffer' to fix app load error.
+                            // FIX: Changed property from 'buffer' to 'data' to match IImageOptions interface.
+                            children: [new ImageRun({ data: logoBuffer, transformation: { width: 120, height: 45 }})],
                             alignment: AlignmentType.CENTER
                         }) : new Paragraph("")],
                         verticalAlign: VerticalAlign.CENTER,

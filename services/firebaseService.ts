@@ -16,7 +16,7 @@ import type { AtaData, Empreendimento } from '../types';
 
 // Your web app's Firebase configuration
 const firebaseConfig = {
-  apiKey: "AIzaSyCWy3FXVAdnHBQMvsZ0IEV-vOI2ad729w",
+  apiKey: process.env.API_KEY,
   authDomain: "atacreator-79583.firebaseapp.com",
   projectId: "atacreator-79583",
   storageBucket: "atacreator-79583.appspot.com",

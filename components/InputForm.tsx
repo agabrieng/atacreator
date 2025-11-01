@@ -1,8 +1,9 @@
 
 
 
+
 import React, { useRef, useState, useEffect } from 'react';
-import { SparklesIcon, XIcon, UploadCloudIcon, SettingsIcon, PlusIcon, DownloadCloudIcon, EditIcon } from './icons';
+import { SparklesIcon, XIcon, UploadCloudIcon, SettingsIcon, PlusIcon, DownloadCloudIcon, EditIcon, ChevronLeftIcon, ChevronRightIcon } from './icons';
 import type { AdminSettings, Empreendimento } from '../types';
 import SettingsPanel from './SettingsPanel';
 import CollapsibleSection from './CollapsibleSection';
@@ -31,6 +32,9 @@ interface InputFormProps {
   isLoading: boolean;
   isEditing: boolean;
   onOpenLoadPanel: () => void;
+  isAtaGenerated: boolean;
+  isCollapsed: boolean;
+  onToggleCollapse: () => void;
 }
 
 const FormInput: React.FC<{ label: string; id: string; value: string; onChange: (e: React.ChangeEvent<HTMLInputElement>) => void; placeholder?: string; }> = ({ label, id, value, onChange, placeholder }) => (
@@ -51,7 +55,7 @@ const FormInput: React.FC<{ label: string; id: string; value: string; onChange: 
 
 
 const InputForm: React.FC<InputFormProps> = (props) => {
-  const { onGenerate, onClear, isLoading, isEditing, vttContent, setVttContent, onOpenLoadPanel } = props;
+  const { onGenerate, onClear, isLoading, isEditing, vttContent, setVttContent, onOpenLoadPanel, isAtaGenerated, isCollapsed, onToggleCollapse } = props;
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isMammothReady, setIsMammothReady] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -104,11 +108,35 @@ const InputForm: React.FC<InputFormProps> = (props) => {
     if (event.target) event.target.value = '';
   };
 
+  if (isCollapsed) {
+    return (
+        <div className="h-full flex items-start justify-center lg:sticky top-8 pt-6">
+            <button
+                onClick={onToggleCollapse}
+                title="Expandir Painel de Informações"
+                className="group w-10 h-10 flex items-center justify-center bg-gray-100 dark:bg-gray-800 rounded-full hover:bg-blue-100 dark:hover:bg-blue-900/50 shadow-md hover:shadow-lg transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 dark:focus:ring-offset-gray-900"
+                aria-label="Expandir painel"
+            >
+                <ChevronRightIcon className="w-5 h-5 text-gray-600 dark:text-gray-300 group-hover:text-blue-600 dark:group-hover:text-blue-300 transition-colors" />
+            </button>
+        </div>
+    );
+  }
+
   return (
     <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 space-y-6">
       <div className="flex justify-between items-center">
         <h2 className="text-xl font-bold text-gray-800 dark:text-gray-100">Informações da Ata</h2>
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-2">
+            {isAtaGenerated && (
+                <button
+                    onClick={onToggleCollapse}
+                    className="group w-8 h-8 flex items-center justify-center bg-transparent hover:bg-gray-100 dark:hover:bg-gray-700/60 rounded-full transition-colors"
+                    title="Recolher Painel"
+                >
+                    <ChevronLeftIcon className="w-5 h-5 text-gray-500 dark:text-gray-400 group-hover:text-blue-600 dark:group-hover:text-blue-400" />
+                </button>
+            )}
           <button 
             onClick={onOpenLoadPanel} 
             disabled={isEditing}
