@@ -47,7 +47,9 @@ const ProjectManagementPanel: React.FC<ProjectManagementPanelProps> = ({
     }
   }, [isOpen]);
 
-  if (!isOpen) return null;
+  if (!isOpen) {
+    return null;
+  }
 
   const handleAddProject = async (e: React.FormEvent) => {
     e.preventDefault();

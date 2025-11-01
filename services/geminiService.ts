@@ -60,6 +60,7 @@ const responseSchema = {
 
 
 export const generateAtaData = async (vtt: string, title: string): Promise<GeminiOutput> => {
+    // FIX: Use process.env.API_KEY as per guidelines and to resolve TypeScript errors.
     const API_KEY = process.env.API_KEY;
 
     if (!API_KEY) {

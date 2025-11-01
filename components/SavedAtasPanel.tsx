@@ -1,5 +1,3 @@
-
-
 import React, { useMemo, useState } from 'react';
 import type { AtaData } from '../types';
 import { XIcon, FileTextIcon, AlertTriangleIcon, ChevronRightIcon, TrashIcon } from './icons';
@@ -29,11 +27,9 @@ const SavedAtasPanel: React.FC<SavedAtasPanelProps> = ({
   onSelect,
   onDelete,
 }) => {
-  if (!isOpen) return null;
-
   const [expandedKeys, setExpandedKeys] = useState<Record<string, boolean>>({});
 
-  const groupedAtas = useMemo<GroupedAtas>(() => {
+  const groupedAtas = useMemo(() => {
     if (!atas) return {};
     return atas.reduce<GroupedAtas>((acc, ata) => {
       const empreendimento = ata.empreendimento || 'Sem Empreendimento';
@@ -49,6 +45,8 @@ const SavedAtasPanel: React.FC<SavedAtasPanelProps> = ({
       return acc;
     }, {});
   }, [atas]);
+
+  if (!isOpen) return null;
 
   const toggleExpand = (key: string) => {
     setExpandedKeys(prev => ({ ...prev, [key]: !prev[key] }));
@@ -73,7 +71,7 @@ const SavedAtasPanel: React.FC<SavedAtasPanelProps> = ({
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex justify-between items-center p-4 border-b border-gray-200 dark:border-gray-700">
-          <h2 className="text-xl font-bold text-gray-800 dark:text-gray-100">Carregar Ata da Nuvem</h2>
+          <h2 className="text-xl font-bold text-gray-800 dark:text-gray-100">Carregar Ata Salva</h2>
           <button
             onClick={onClose}
             className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
@@ -102,7 +100,7 @@ const SavedAtasPanel: React.FC<SavedAtasPanelProps> = ({
               <div className="flex flex-col items-center justify-center h-full text-center text-gray-500 dark:text-gray-400">
                 <FileTextIcon className="w-16 h-16 mb-4 text-gray-300 dark:text-gray-600" />
                 <h3 className="text-lg font-semibold">Nenhuma Ata Encontrada</h3>
-                <p className="max-w-md mt-1 text-sm">Parece que você ainda não salvou nenhuma ata na nuvem.</p>
+                <p className="max-w-md mt-1 text-sm">Parece que você ainda não salvou nenhuma ata.</p>
               </div>
           )}
 

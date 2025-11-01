@@ -1,7 +1,3 @@
-
-
-
-
 import React, { useRef, useState, useEffect } from 'react';
 import { SparklesIcon, XIcon, UploadCloudIcon, SettingsIcon, PlusIcon, DownloadCloudIcon, EditIcon, ChevronLeftIcon, ChevronRightIcon } from './icons';
 import type { AdminSettings, Empreendimento } from '../types';
@@ -140,7 +136,7 @@ const InputForm: React.FC<InputFormProps> = (props) => {
           <button 
             onClick={onOpenLoadPanel} 
             disabled={isEditing}
-            title={isEditing ? "Conclua a edição para poder carregar" : "Carregar Ata da Nuvem"}
+            title={isEditing ? "Conclua a edição para poder carregar" : "Carregar Ata Salva"}
             className="inline-flex items-center text-sm font-medium text-gray-600 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 disabled:opacity-50 disabled:cursor-not-allowed"
           >
               <DownloadCloudIcon className="w-5 h-5 mr-2" />

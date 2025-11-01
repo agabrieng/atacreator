@@ -1,10 +1,7 @@
-
-
-
 import React, { useState, useCallback, useEffect } from 'react';
 import type { AtaData, AdminSettings, Participant, PautaItem, Empreendimento } from './types';
 import { generateAtaData } from './services/geminiService';
-import { saveAtaToFirestore, loadAtasFromFirestore, deleteAtaFromFirestore, getEmpreendimentos, addEmpreendimento, updateEmpreendimento, deleteEmpreendimento } from './services/firebaseService';
+import { saveAtaToLocalStorage, loadAtasFromLocalStorage, deleteAtaFromLocalStorage, getEmpreendimentos, addEmpreendimento, updateEmpreendimento, deleteEmpreendimento } from './services/localStorageService';
 import { exportToPdf } from './services/exportService';
 import Header from './components/Header';
 import InputForm from './components/InputForm';
@@ -13,7 +10,7 @@ import Loader from './components/Loader';
 import ConfirmationDialog from './components/ConfirmationDialog';
 import SavedAtasPanel from './components/SavedAtasPanel';
 import ProjectManagementPanel from './components/ProjectManagementPanel';
-import { AlertTriangleIcon, EditIcon, CheckIcon, CopyIcon, UploadCloudIcon, DownloadCloudIcon, FilePdfIcon, ExternalLinkIcon } from './components/icons';
+import { AlertTriangleIcon, EditIcon, CheckIcon, CopyIcon, SaveIcon, DownloadCloudIcon, FilePdfIcon } from './components/icons';
 
 const DEFAULT_COMPANY_NAME = "Minha Empresa";
 const DEFAULT_SETTINGS: AdminSettings = {
@@ -59,7 +56,6 @@ const App: React.FC = () => {
   const [ata, setAta] = useState<AtaData | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
-  const [indexErrorUrl, setIndexErrorUrl] = useState<string | null>(null);
   const [showClearConfirmation, setShowClearConfirmation] = useState(false);
   const [showOverwriteConfirmation, setShowOverwriteConfirmation] = useState(false);
   const [showSaveReminder, setShowSaveReminder] = useState(false);
@@ -122,28 +118,12 @@ const App: React.FC = () => {
     const fetchEmpreendimentos = async () => {
         try {
             setIsProjectsLoading(true);
-            setIndexErrorUrl(null); // Reset on each fetch attempt
+            setError(null);
             const loadedEmpreendimentos = await getEmpreendimentos();
             setEmpreendimentos(loadedEmpreendimentos);
         } catch (error: any) {
-            console.error("Failed to load empreendimentos", error);
-            let errorMessage = "Falha ao carregar a lista de empreendimentos.";
-            const errorMessageText = error?.message?.toLowerCase() || '';
-            
-            if (error?.code === 'permission-denied' || errorMessageText.includes('insufficient permissions')) {
-              errorMessage = `Erro de Permissão: Acesso negado ao banco de dados. As Regras de Segurança do Firestore estão bloqueando a solicitação.\n\nPara permitir que o aplicativo funcione, atualize as regras no seu console do Firebase para permitir acesso público às coleções 'atas' e 'empreendimentos'.\n\nExemplo de regras:\n\nrules_version = '2';\nservice cloud.firestore {\n  match /databases/{database}/documents {\n    match /atas/{document=**} {\n      allow read, write: if true;\n    }\n    match /empreendimentos/{document=**} {\n      allow read, write: if true;\n    }\n  }\n}`;
-            } else if (error?.code === 'failed-precondition' && errorMessageText.includes('query requires an index')) {
-                const urlRegex = /(https?:\/\/[^\s]+)/;
-                const urlMatch = error.message.match(urlRegex);
-                const extractedUrl = urlMatch ? urlMatch[0] : null;
-                setIndexErrorUrl(extractedUrl);
-
-                errorMessage = `Erro de Configuração do Banco de Dados: A consulta para ordenar os empreendimentos precisa de um 'índice' no Firestore.\n\nIsso é necessário para otimizar a ordenação dos dados.\n\n**Solução:** Clique no botão abaixo para criar o índice automaticamente no seu painel do Firebase. Após a criação (pode levar alguns minutos), atualize esta página.`;
-
-            } else if (error instanceof Error) {
-                errorMessage = `Falha ao carregar empreendimentos: ${error.message}`;
-            }
-            setError(errorMessage);
+            console.error("Failed to load empreendimentos from localStorage", error);
+            setError("Falha ao carregar a lista de empreendimentos do armazenamento local.");
         } finally {
             setIsProjectsLoading(false);
         }
@@ -262,7 +242,6 @@ const App: React.FC = () => {
 
     setIsLoading(true);
     setError(null);
-    setIndexErrorUrl(null);
     setAta(null);
     setOriginalLoadedAta(null); // Reset loaded ata state
     setIsEditing(false); // Reset editing mode on new generation
@@ -359,7 +338,6 @@ const App: React.FC = () => {
     setAta(null);
     setOriginalLoadedAta(null); // Reset loaded ata state
     setError(null);
-    setIndexErrorUrl(null);
     setIsEditing(false); // Reset editing state
     setInvalidDeadlineFields(new Set()); // Clear validation state
     setIsFormCollapsed(false);
@@ -370,12 +348,12 @@ const App: React.FC = () => {
       setShowClearConfirmation(false);
   };
 
-  const handleSaveToCloud = useCallback(async () => {
+  const handleSave = useCallback(async () => {
     if (!ata) return;
     setIsSaving(true);
     setSaveSuccess(false);
     try {
-      const docId = await saveAtaToFirestore(ata);
+      const docId = await saveAtaToLocalStorage(ata);
       const savedAta = { ...ata, id: docId };
       setAta(savedAta);
       // If we just updated a loaded ata, update the original state to prevent repeated warnings
@@ -385,7 +363,7 @@ const App: React.FC = () => {
       setSaveSuccess(true);
       setTimeout(() => setSaveSuccess(false), 2500);
     } catch (error) {
-      console.error("Erro ao salvar a ata no Firestore:", error);
+      console.error("Erro ao salvar a ata no localStorage:", error);
       alert("Ocorreu um erro ao salvar a ata. Verifique o console para mais detalhes.");
     } finally {
       setIsSaving(false);
@@ -397,7 +375,7 @@ const App: React.FC = () => {
     setIsSavedAtasLoading(true);
     setLoadError(null);
     try {
-        const loadedAtas = await loadAtasFromFirestore();
+        const loadedAtas = await loadAtasFromLocalStorage();
         loadedAtas.sort((a, b) => {
             const dateA = a.data.split('/').reverse().join('');
             const dateB = b.data.split('/').reverse().join('');
@@ -405,8 +383,8 @@ const App: React.FC = () => {
         });
         setSavedAtas(loadedAtas);
     } catch (error) {
-        console.error("Failed to load atas from Firestore:", error);
-        setLoadError("Não foi possível carregar as atas. Verifique sua conexão e a configuração do Firestore.");
+        console.error("Failed to load atas from localStorage:", error);
+        setLoadError("Não foi possível carregar as atas. Verifique se há dados salvos no seu navegador.");
     } finally {
         setIsSavedAtasLoading(false);
     }
@@ -435,7 +413,7 @@ const App: React.FC = () => {
   const onConfirmDelete = async () => {
     if (!ataToDelete || !ataToDelete.id) return;
     try {
-      await deleteAtaFromFirestore(ataToDelete.id);
+      await deleteAtaFromLocalStorage(ataToDelete.id);
       setSavedAtas(prev => prev.filter(a => a.id !== ataToDelete.id));
       if (ata?.id === ataToDelete.id) {
         handleClear();
@@ -522,7 +500,7 @@ const App: React.FC = () => {
                 />
             </div>
           <div className="relative lg:sticky top-8 bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 min-h-[calc(100vh-10rem)] transition-all duration-300 ease-in-out">
-            {isLoading && <Loader />}
+            {(isLoading && !error) && <Loader />}
             {error && (
               <div className="flex flex-col items-center justify-center h-full text-center p-4">
                 <AlertTriangleIcon className="w-16 h-16 mb-4 text-red-500" />
@@ -530,12 +508,6 @@ const App: React.FC = () => {
                 <div className="max-w-2xl w-full bg-red-50 dark:bg-gray-700/50 text-red-700 dark:text-red-300 p-4 rounded-lg text-left font-mono text-sm overflow-auto">
                     <pre className="whitespace-pre-wrap break-words">{error}</pre>
                 </div>
-                {indexErrorUrl && (
-                    <a href={indexErrorUrl} target="_blank" rel="noopener noreferrer" className="mt-4 inline-flex items-center gap-2 px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
-                        <ExternalLinkIcon className="w-4 h-4" />
-                        Criar Índice no Firebase
-                    </a>
-                )}
               </div>
             )}
             {!isLoading && !error && (
@@ -560,12 +532,12 @@ const App: React.FC = () => {
                         <span>Copiar</span>
                     </ActionButton>
                     <ActionButton
-                        onClick={handleSaveToCloud}
+                        onClick={handleSave}
                         disabled={isEditing || isSaving}
-                        title={isEditing ? "Conclua a edição para poder salvar" : "Salvar na Nuvem"}
+                        title={isEditing ? "Conclua a edição para poder salvar" : "Salvar localmente"}
                         className={`bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-200 border border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600 focus:ring-blue-500 ${saveSuccess ? 'border-green-500' : ''}`}
                     >
-                        {saveSuccess ? <CheckIcon className="w-5 h-5 text-green-500" /> : <UploadCloudIcon className="w-5 h-5" />}
+                        {saveSuccess ? <CheckIcon className="w-5 h-5 text-green-500" /> : <SaveIcon className="w-5 h-5" />}
                         <span>{isSaving ? 'Salvando...' : 'Salvar'}</span>
                     </ActionButton>
                     <div className="flex-grow"></div>
@@ -611,7 +583,7 @@ const App: React.FC = () => {
       >
         Tem certeza de que deseja limpar todos os campos e começar uma nova ata? Todos os dados não salvos serão perdidos.
         <br/><br/>
-        <strong>Dica:</strong> Salve a ata atual na nuvem antes de limpar, caso queira recuperá-la mais tarde.
+        <strong>Dica:</strong> Salve a ata atual antes de limpar, caso queira recuperá-la mais tarde.
       </ConfirmationDialog>
       <ConfirmationDialog
         isOpen={showOverwriteConfirmation}
