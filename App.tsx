@@ -10,6 +10,7 @@ import Loader from './components/Loader';
 import ConfirmationDialog from './components/ConfirmationDialog';
 import SavedAtasPanel from './components/SavedAtasPanel';
 import ProjectManagementPanel from './components/ProjectManagementPanel';
+import DeadlinePanel from './components/DeadlinePanel';
 import { AlertTriangleIcon, EditIcon, CheckIcon, CopyIcon, UploadCloudIcon, DownloadCloudIcon, FilePdfIcon } from './components/icons';
 
 const DEFAULT_COMPANY_NAME = "Minha Empresa";
@@ -88,6 +89,9 @@ const App: React.FC = () => {
   
   // State for collapsible form
   const [isFormCollapsed, setIsFormCollapsed] = useState(false);
+
+  // State for Deadline Panel
+  const [isDeadlinePanelOpen, setIsDeadlinePanelOpen] = useState(false);
 
 
   useEffect(() => {
@@ -398,6 +402,7 @@ const App: React.FC = () => {
     setLocal(selectedAta.local || '');
     setVttContent('');
     setShowLoadPanel(false);
+    setIsDeadlinePanelOpen(false); // Close deadline panel if open
     setIsEditing(true); // Abrir em modo de edição
     setIsFormCollapsed(true);
   }, []);
@@ -491,6 +496,7 @@ const App: React.FC = () => {
                     isLoading={isLoading}
                     isEditing={isEditing}
                     onOpenLoadPanel={handleOpenLoadPanel}
+                    onOpenDeadlinePanel={() => setIsDeadlinePanelOpen(true)}
                     isAtaGenerated={!!ata}
                     isCollapsed={isFormCollapsed && !!ata}
                     onToggleCollapse={() => setIsFormCollapsed(!isFormCollapsed)}
@@ -571,6 +577,12 @@ const App: React.FC = () => {
         onAdd={handleAddProject}
         onUpdate={handleUpdateProject}
         onDelete={handleDeleteProject}
+      />
+      <DeadlinePanel
+        isOpen={isDeadlinePanelOpen}
+        onClose={() => setIsDeadlinePanelOpen(false)}
+        onSelectAta={handleSelectSavedAta}
+        adminSettings={adminSettings}
       />
       <ConfirmationDialog
         isOpen={showClearConfirmation}

@@ -240,14 +240,16 @@ const MinutesDisplay: React.FC<MinutesDisplayProps> = ({ ata, setAta, isEditing,
     
     const addPautaItem = () => {
         if (!ata) return;
-        const newItemNumber = ata.pauta.length > 0 ? `${parseInt(ata.pauta[ata.pauta.length - 1].item.replace('.', '')) + 1}.` : '1.';
+        const newItemNumber = `${ata.pauta.length + 1}.`;
         const newPauta = [...ata.pauta, { item: newItemNumber, descricao: '', responsaveis: [] }];
         setAta({ ...ata, pauta: newPauta });
     };
 
     const removePautaItem = (index: number) => {
         if (!ata) return;
-        const newPauta = ata.pauta.filter((_, i) => i !== index);
+        const newPauta = ata.pauta
+            .filter((_, i) => i !== index)
+            .map((item, i) => ({ ...item, item: `${i + 1}.` }));
         setAta({ ...ata, pauta: newPauta });
     };
 

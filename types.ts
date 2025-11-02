@@ -18,6 +18,8 @@ export interface ResponsavelPrazo {
     id: string; // for React keys
     responsavel: string;
     prazo: string | null;
+    completed?: boolean;
+    completionDate?: string | null;
 }
 
 export interface PautaItem {
@@ -63,3 +65,33 @@ export interface Empreendimento {
   name: string;
   contrato: string;
 }
+
+// --- Types for Deadline Panel ---
+
+export type TaskStatus = 'overdue' | 'due-today' | 'upcoming' | 'completed' | 'no-deadline';
+
+export interface Task {
+  id: string;
+  description: string;
+  responsible: string;
+  deadline: string; // The original DD/MM/YYYY string
+  deadlineDate: Date | null;
+  status: TaskStatus;
+  sourceAta: {
+    id: string;
+    title: string;
+    date: string;
+    empreendimento: string;
+  };
+  originalAta: AtaData;
+  // New fields for completion tracking
+  completed: boolean;
+  completionDate: string | null; // Stored as YYYY-MM-DD
+  // For easier updates
+  pautaItemIndex: number;
+  responsavelId: string;
+}
+
+export type GroupedTasks = {
+    [responsible: string]: Task[];
+};

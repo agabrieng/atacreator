@@ -1,5 +1,5 @@
 import React, { useRef, useState, useEffect } from 'react';
-import { SparklesIcon, XIcon, UploadCloudIcon, SettingsIcon, PlusIcon, DownloadCloudIcon, EditIcon, ChevronLeftIcon, ChevronRightIcon } from './icons';
+import { SparklesIcon, XIcon, UploadCloudIcon, SettingsIcon, PlusIcon, DownloadCloudIcon, EditIcon, ChevronLeftIcon, ChevronRightIcon, CalendarCheckIcon } from './icons';
 import type { AdminSettings, Empreendimento } from '../types';
 import SettingsPanel from './SettingsPanel';
 import CollapsibleSection from './CollapsibleSection';
@@ -28,6 +28,7 @@ interface InputFormProps {
   isLoading: boolean;
   isEditing: boolean;
   onOpenLoadPanel: () => void;
+  onOpenDeadlinePanel: () => void;
   isAtaGenerated: boolean;
   isCollapsed: boolean;
   onToggleCollapse: () => void;
@@ -51,7 +52,7 @@ const FormInput: React.FC<{ label: string; id: string; value: string; onChange: 
 
 
 const InputForm: React.FC<InputFormProps> = (props) => {
-  const { onGenerate, onClear, isLoading, isEditing, vttContent, setVttContent, onOpenLoadPanel, isAtaGenerated, isCollapsed, onToggleCollapse } = props;
+  const { onGenerate, onClear, isLoading, isEditing, vttContent, setVttContent, onOpenLoadPanel, onOpenDeadlinePanel, isAtaGenerated, isCollapsed, onToggleCollapse } = props;
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isMammothReady, setIsMammothReady] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -133,6 +134,14 @@ const InputForm: React.FC<InputFormProps> = (props) => {
                     <ChevronLeftIcon className="w-5 h-5 text-gray-500 dark:text-gray-400 group-hover:text-blue-600 dark:group-hover:text-blue-400" />
                 </button>
             )}
+           <button 
+            onClick={onOpenDeadlinePanel} 
+            title="Abrir painel de controle de prazos"
+            className="inline-flex items-center text-sm font-medium text-gray-600 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400"
+          >
+              <CalendarCheckIcon className="w-5 h-5 mr-2" />
+              Prazos
+          </button>
           <button 
             onClick={onOpenLoadPanel} 
             disabled={isEditing}
@@ -144,7 +153,7 @@ const InputForm: React.FC<InputFormProps> = (props) => {
           </button>
           <button onClick={() => setIsSettingsOpen(true)} className="inline-flex items-center text-sm font-medium text-gray-600 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400">
               <SettingsIcon className="w-5 h-5 mr-2" />
-              Configurações
+              Config.
           </button>
         </div>
       </div>

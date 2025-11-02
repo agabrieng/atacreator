@@ -29,9 +29,11 @@ const SavedAtasPanel: React.FC<SavedAtasPanelProps> = ({
 }) => {
   const [expandedKeys, setExpandedKeys] = useState<Record<string, boolean>>({});
 
+  // FIX: Explicitly type the accumulator and initial value for the `reduce` method
+  // to resolve the "Untyped function calls may not accept type arguments" error.
   const groupedAtas = useMemo(() => {
     if (!atas) return {};
-    return atas.reduce<GroupedAtas>((acc, ata) => {
+    return atas.reduce((acc: GroupedAtas, ata) => {
       const empreendimento = ata.empreendimento || 'Sem Empreendimento';
       const assunto = ata.assunto || 'Sem Assunto';
       
@@ -43,7 +45,7 @@ const SavedAtasPanel: React.FC<SavedAtasPanelProps> = ({
       }
       acc[empreendimento][assunto].push(ata);
       return acc;
-    }, {});
+    }, {} as GroupedAtas);
   }, [atas]);
 
   if (!isOpen) return null;
