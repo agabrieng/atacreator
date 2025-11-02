@@ -407,6 +407,22 @@ const App: React.FC = () => {
     setIsFormCollapsed(true);
   }, []);
 
+  const handleViewAtaFromDeadlinePanel = useCallback((selectedAta: AtaData) => {
+    setAta(selectedAta);
+    setOriginalLoadedAta(selectedAta);
+    setEmpreendimento(selectedAta.empreendimento || '');
+    setArea(selectedAta.area || '');
+    setTitulo(selectedAta.titulo || '');
+    setContrato(selectedAta.contrato || '');
+    setAssunto(selectedAta.assunto || '');
+    setLocal(selectedAta.local || '');
+    setVttContent('');
+    setShowLoadPanel(false);
+    setIsDeadlinePanelOpen(false); 
+    setIsEditing(false); // Open in read-only mode
+    setIsFormCollapsed(true);
+  }, []);
+
   const handleDeleteClick = (ata: AtaData) => {
     setAtaToDelete(ata);
     setShowDeleteConfirmation(true);
@@ -581,7 +597,7 @@ const App: React.FC = () => {
       <DeadlinePanel
         isOpen={isDeadlinePanelOpen}
         onClose={() => setIsDeadlinePanelOpen(false)}
-        onSelectAta={handleSelectSavedAta}
+        onSelectAta={handleViewAtaFromDeadlinePanel}
         adminSettings={adminSettings}
       />
       <ConfirmationDialog
