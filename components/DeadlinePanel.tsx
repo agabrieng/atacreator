@@ -4,7 +4,7 @@ import type { AtaData, Task, GroupedTasks, AdminSettings } from '../types';
 import { getAllTasks, groupTasksByResponsible, getTaskStatus } from '../services/taskService';
 import { saveAtaToFirebase } from '../services/firebaseService';
 import { generateDailyBulletinHtml } from '../services/emailService';
-import { XIcon, AlertTriangleIcon, CalendarCheckIcon, ChevronRightIcon, ExternalLinkIcon } from './icons';
+import { XIcon, AlertTriangleIcon, CalendarCheckIcon, ChevronRightIcon, ExternalLinkIcon, SparklesIcon, CopyIcon, CheckIcon } from './icons';
 
 interface DeadlinePanelProps {
   isOpen: boolean;
@@ -59,8 +59,26 @@ const EmailPreviewModal: React.FC<{
     isOpen: boolean;
     onClose: () => void;
     htmlContent: string;
-}> = ({ isOpen, onClose, htmlContent }) => {
+    subject: string;
+}> = ({ isOpen, onClose, htmlContent, subject }) => {
+    const [copied, setCopied] = useState(false);
+
     if (!isOpen) return null;
+
+    const handleCopyToClipboard = async () => {
+        try {
+            // Use the Clipboard API to write HTML for rich text pasting
+            const blob = new Blob([htmlContent], { type: 'text/html' });
+            const clipboardItem = new ClipboardItem({ 'text/html': blob });
+            await navigator.clipboard.write([clipboardItem]);
+            
+            setCopied(true);
+            setTimeout(() => setCopied(false), 2500);
+        } catch (err) {
+            console.error('Failed to copy HTML to clipboard:', err);
+            alert('Falha ao copiar. Por favor, tente copiar o conteúdo manualmente.');
+        }
+    };
 
     return (
         <div className="fixed inset-0 bg-black bg-opacity-70 z-50 flex items-center justify-center p-4" onClick={onClose}>
@@ -71,13 +89,121 @@ const EmailPreviewModal: React.FC<{
                 </div>
                 <div className="p-4 bg-gray-200 dark:bg-gray-900 text-sm font-mono rounded-t-md">
                     <p><span className="font-semibold text-gray-600 dark:text-gray-400">Para:</span> agabriengenharia@gmail.com</p>
-                    <p><span className="font-semibold text-gray-600 dark:text-gray-400">Assunto:</span> Boletim Diário de Prazos - {new Date().toLocaleDateString('pt-BR')}</p>
+                    <p><span className="font-semibold text-gray-600 dark:text-gray-400">Assunto:</span> {subject}</p>
                 </div>
                 <iframe srcDoc={htmlContent} title="Email Preview" className="w-full flex-grow border-0" />
+                <div className="bg-gray-50 dark:bg-gray-800/50 px-6 py-4 flex justify-between items-center rounded-b-xl">
+                    <p className="text-xs text-gray-500 dark:text-gray-400 max-w-xs">
+                        Clique em "Copiar Boletim" e cole no corpo do seu e-mail para manter a formatação profissional.
+                    </p>
+                    <div className="flex flex-row-reverse gap-3">
+                         <button
+                            type="button"
+                            className="inline-flex justify-center rounded-md border border-gray-300 dark:border-gray-600 shadow-sm px-4 py-2 bg-white dark:bg-gray-700 text-base font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-600"
+                            onClick={onClose}
+                        >
+                            Fechar
+                        </button>
+                        <button
+                            type="button"
+                            onClick={handleCopyToClipboard}
+                            className={`inline-flex items-center justify-center rounded-md border shadow-sm px-4 py-2 text-base font-medium focus:outline-none focus:ring-2 focus:ring-offset-2 dark:focus:ring-offset-gray-800 transition-colors ${
+                                copied 
+                                ? 'bg-green-600 hover:bg-green-700 border-transparent text-white focus:ring-green-500' 
+                                : 'bg-blue-600 hover:bg-blue-700 border-transparent text-white focus:ring-blue-500'
+                            }`}
+                        >
+                            {copied ? <CheckIcon className="w-5 h-5 mr-2" /> : <CopyIcon className="w-5 h-5 mr-2" />}
+                            {copied ? 'Copiado!' : 'Copiar Boletim'}
+                        </button>
+                    </div>
+                </div>
             </div>
         </div>
     );
 };
+
+const BulletinFilterModal: React.FC<{
+    isOpen: boolean;
+    onClose: () => void;
+    onGenerate: () => void;
+    empreendimentos: string[];
+    responsaveis: string[];
+    selectedEmpreendimento: string;
+    setSelectedEmpreendimento: (value: string) => void;
+    selectedResponsavel: string;
+    setSelectedResponsavel: (value: string) => void;
+}> = ({ isOpen, onClose, onGenerate, empreendimentos, responsaveis, selectedEmpreendimento, setSelectedEmpreendimento, selectedResponsavel, setSelectedResponsavel }) => {
+    if (!isOpen) return null;
+
+    return (
+        <div className="fixed inset-0 bg-black bg-opacity-60 z-50 flex items-center justify-center p-4" onClick={onClose}>
+            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl w-full max-w-md" onClick={(e) => e.stopPropagation()}>
+                <div className="p-6">
+                    <div className="flex justify-between items-start">
+                        <h3 className="text-lg leading-6 font-bold text-gray-900 dark:text-gray-100 flex items-center">
+                           <SparklesIcon className="w-5 h-5 mr-2 text-blue-500"/>
+                            Gerar Boletim Direcionado
+                        </h3>
+                         <button onClick={onClose} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200">
+                            <XIcon className="w-6 h-6" />
+                        </button>
+                    </div>
+                    <div className="mt-4 space-y-4">
+                        <div>
+                            <label htmlFor="empreendimento-filter" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                                Filtrar por Empreendimento
+                            </label>
+                            <select
+                                id="empreendimento-filter"
+                                value={selectedEmpreendimento}
+                                onChange={(e) => setSelectedEmpreendimento(e.target.value)}
+                                className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md"
+                            >
+                                <option value="all">Todos os Empreendimentos</option>
+                                {empreendimentos.map(emp => <option key={emp} value={emp}>{emp}</option>)}
+                            </select>
+                        </div>
+                         <div>
+                            <label htmlFor="responsavel-filter" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                                Filtrar por Responsável
+                            </label>
+                            <select
+                                id="responsavel-filter"
+                                value={selectedResponsavel}
+                                onChange={(e) => setSelectedResponsavel(e.target.value)}
+                                className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md"
+                            >
+                                <option value="all">Todos os Responsáveis</option>
+                                {responsaveis.map(resp => <option key={resp} value={resp}>{resp}</option>)}
+                            </select>
+                        </div>
+                        <p className="text-xs text-gray-500 dark:text-gray-400 pt-2">
+                            O boletim incluirá tarefas com status 'Atrasado' ou 'Entrega Hoje' que não foram concluídas, com base nos filtros selecionados.
+                        </p>
+                    </div>
+                </div>
+                <div className="bg-gray-50 dark:bg-gray-800/50 px-6 py-4 flex flex-row-reverse gap-3 rounded-b-xl">
+                    <button
+                        type="button"
+                        className="inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-blue-600 text-base font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                        onClick={onGenerate}
+                    >
+                        Gerar Boletim
+                    </button>
+                    <button
+                        type="button"
+                        className="inline-flex justify-center rounded-md border border-gray-300 dark:border-gray-600 shadow-sm px-4 py-2 bg-white dark:bg-gray-700 text-base font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                        onClick={onClose}
+                    >
+                        Cancelar
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+};
+
 
 const DeadlinePanel: React.FC<DeadlinePanelProps> = ({ isOpen, onClose, onSelectAta, adminSettings }) => {
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -87,6 +213,10 @@ const DeadlinePanel: React.FC<DeadlinePanelProps> = ({ isOpen, onClose, onSelect
   const [showEmailPreview, setShowEmailPreview] = useState(false);
   const [emailHtml, setEmailHtml] = useState('');
   const [showCompleted, setShowCompleted] = useState(true);
+  const [isBulletinModalOpen, setIsBulletinModalOpen] = useState(false);
+  const [selectedEmpreendimento, setSelectedEmpreendimento] = useState<string>('all');
+  const [selectedResponsavel, setSelectedResponsavel] = useState<string>('all');
+
 
   const fetchAndSetTasks = async () => {
     try {
@@ -110,6 +240,16 @@ const DeadlinePanel: React.FC<DeadlinePanelProps> = ({ isOpen, onClose, onSelect
 
   const groupedTasks = useMemo(() => groupTasksByResponsible(tasks), [tasks]);
   
+  const uniqueEmpreendimentos = useMemo(() => {
+      const empreendimentos = new Set(tasks.map(task => task.sourceAta.empreendimento));
+      return Array.from(empreendimentos).sort();
+  }, [tasks]);
+  
+  const uniqueResponsaveis = useMemo(() => {
+      const responsaveis = new Set(tasks.map(task => task.responsible));
+      return Array.from(responsaveis).sort();
+  }, [tasks]);
+
   const handleUpdateTask = async (updatedTask: Task) => {
     // Optimistic UI update
     const originalTasks = tasks;
@@ -164,10 +304,29 @@ const DeadlinePanel: React.FC<DeadlinePanelProps> = ({ isOpen, onClose, onSelect
   };
   
   const handleGenerateEmail = () => {
-    const html = generateDailyBulletinHtml(tasks, adminSettings);
+    let filteredTasks = tasks;
+    if (selectedEmpreendimento !== 'all') {
+        filteredTasks = filteredTasks.filter(task => task.sourceAta.empreendimento === selectedEmpreendimento);
+    }
+    if (selectedResponsavel !== 'all') {
+        filteredTasks = filteredTasks.filter(task => task.responsible === selectedResponsavel);
+    }
+
+    const html = generateDailyBulletinHtml(filteredTasks, adminSettings, selectedEmpreendimento, selectedResponsavel);
     setEmailHtml(html);
     setShowEmailPreview(true);
+    setIsBulletinModalOpen(false); // Close filter modal after generating
   };
+
+  const subjectLineFilters: string[] = [];
+  if (selectedEmpreendimento && selectedEmpreendimento !== 'all') {
+      subjectLineFilters.push(`Empreendimento: ${selectedEmpreendimento}`);
+  }
+  if (selectedResponsavel && selectedResponsavel !== 'all') {
+      subjectLineFilters.push(`Responsável: ${selectedResponsavel}`);
+  }
+  const subjectSuffix = subjectLineFilters.length > 0 ? ` - ${subjectLineFilters.join(' | ')}` : '';
+  const emailSubject = `Boletim Diário de Prazos - ${new Date().toLocaleDateString('pt-BR')}${subjectSuffix}`;
 
   return (
     <>
@@ -271,7 +430,7 @@ const DeadlinePanel: React.FC<DeadlinePanelProps> = ({ isOpen, onClose, onSelect
           <div className="p-4 border-t border-gray-200 dark:border-gray-700 flex justify-between items-center">
             <p className="text-sm text-gray-500 dark:text-gray-400">Total de {tasks.length} tarefas encontradas.</p>
             <div className="flex gap-3">
-                 <button type="button" onClick={handleGenerateEmail} className="inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-blue-600 text-base font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 dark:focus:ring-offset-gray-800">
+                 <button type="button" onClick={() => setIsBulletinModalOpen(true)} className="inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-blue-600 text-base font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 dark:focus:ring-offset-gray-800">
                     Gerar Boletim do Dia
                 </button>
                 <button type="button" onClick={onClose} className="inline-flex justify-center rounded-md border border-gray-300 dark:border-gray-600 shadow-sm px-4 py-2 bg-white dark:bg-gray-700 text-base font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 dark:focus:ring-offset-gray-800">
@@ -281,7 +440,18 @@ const DeadlinePanel: React.FC<DeadlinePanelProps> = ({ isOpen, onClose, onSelect
           </div>
         </div>
       </div>
-      <EmailPreviewModal isOpen={showEmailPreview} onClose={() => setShowEmailPreview(false)} htmlContent={emailHtml} />
+      <BulletinFilterModal
+        isOpen={isBulletinModalOpen}
+        onClose={() => setIsBulletinModalOpen(false)}
+        onGenerate={handleGenerateEmail}
+        empreendimentos={uniqueEmpreendimentos}
+        responsaveis={uniqueResponsaveis}
+        selectedEmpreendimento={selectedEmpreendimento}
+        setSelectedEmpreendimento={setSelectedEmpreendimento}
+        selectedResponsavel={selectedResponsavel}
+        setSelectedResponsavel={setSelectedResponsavel}
+      />
+      <EmailPreviewModal isOpen={showEmailPreview} onClose={() => setShowEmailPreview(false)} htmlContent={emailHtml} subject={emailSubject} />
     </>
   );
 };
