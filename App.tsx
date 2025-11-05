@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useEffect } from 'react';
-import type { AtaData, AdminSettings, Participant, PautaItem, Empreendimento } from './types';
+import type { AtaData, AdminSettings, Participant, PautaItem, Empreendimento, Webhook } from './types';
 import { generateAtaData } from './services/geminiService';
 import { saveAtaToFirebase, loadAtasFromFirebase, deleteAtaFromFirebase, getEmpreendimentos, addEmpreendimento, updateEmpreendimento, deleteEmpreendimento } from './services/firebaseService';
 import { exportToPdf } from './services/exportService';
@@ -11,6 +11,7 @@ import ConfirmationDialog from './components/ConfirmationDialog';
 import SavedAtasPanel from './components/SavedAtasPanel';
 import ProjectManagementPanel from './components/ProjectManagementPanel';
 import DeadlinePanel from './components/DeadlinePanel';
+import WebhookPanel from './components/WebhookPanel';
 import { AlertTriangleIcon, EditIcon, CheckIcon, CopyIcon, UploadCloudIcon, DownloadCloudIcon, FilePdfIcon, CheckCircleIcon, XIcon } from './components/icons';
 
 const DEFAULT_COMPANY_NAME = "Minha Empresa";
@@ -129,6 +130,10 @@ const App: React.FC = () => {
 
   // State for Deadline Panel
   const [isDeadlinePanelOpen, setIsDeadlinePanelOpen] = useState(false);
+  
+  // State for Webhooks
+  const [webhooks, setWebhooks] = useState<Webhook[]>([]);
+  const [isWebhookPanelOpen, setIsWebhookPanelOpen] = useState(false);
 
   // State for Toast notifications
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
@@ -153,8 +158,14 @@ const App: React.FC = () => {
       } else {
         setCurrentCompanyName(Object.keys(profiles)[0]);
       }
+      
+      const savedWebhooksStr = localStorage.getItem('ata-webhooks');
+      if (savedWebhooksStr) {
+        setWebhooks(JSON.parse(savedWebhooksStr));
+      }
+
     } catch (e) {
-      console.error("Failed to load settings from localStorage", e);
+      console.error("Failed to load settings or webhooks from localStorage", e);
       setCompanyProfiles({ [DEFAULT_COMPANY_NAME]: DEFAULT_SETTINGS });
       setCurrentCompanyName(DEFAULT_COMPANY_NAME);
     }
@@ -228,6 +239,13 @@ const App: React.FC = () => {
     localStorage.setItem('ata-company-profiles', JSON.stringify(profiles));
     localStorage.setItem('ata-current-company-name', currentCompany);
   }, []);
+  
+  const handleWebhookSave = (newWebhooks: Webhook[]) => {
+    const sortedWebhooks = [...newWebhooks].sort((a, b) => a.name.localeCompare(b.name));
+    setWebhooks(sortedWebhooks);
+    localStorage.setItem('ata-webhooks', JSON.stringify(sortedWebhooks));
+  };
+
 
   // --- Project Management Handlers ---
   const handleAddProject = async (name: string, contrato: string) => {
@@ -557,6 +575,7 @@ const App: React.FC = () => {
                     isEditing={isEditing}
                     onOpenLoadPanel={handleOpenLoadPanel}
                     onOpenDeadlinePanel={() => setIsDeadlinePanelOpen(true)}
+                    onOpenWebhookPanel={() => setIsWebhookPanelOpen(true)}
                     isAtaGenerated={!!ata}
                     isCollapsed={isFormCollapsed && !!ata}
                     onToggleCollapse={() => setIsFormCollapsed(!isFormCollapsed)}
@@ -650,6 +669,13 @@ const App: React.FC = () => {
         onClose={() => setIsDeadlinePanelOpen(false)}
         onSelectAta={handleViewAtaFromDeadlinePanel}
         adminSettings={adminSettings}
+        webhooks={webhooks}
+      />
+      <WebhookPanel
+        isOpen={isWebhookPanelOpen}
+        onClose={() => setIsWebhookPanelOpen(false)}
+        webhooks={webhooks}
+        onSave={handleWebhookSave}
       />
       <ConfirmationDialog
         isOpen={showClearConfirmation}
@@ -659,7 +685,7 @@ const App: React.FC = () => {
       >
         Tem certeza de que deseja limpar todos os campos e começar uma nova ata? Todos os dados não salvos serão perdidos.
         <br/><br/>
-        <strong>Dica:</strong> Salve a ata atual antes de limpar, caso queira recuperá-la mais tarde.
+        <strong>Dica:</strong> Salve a ata atual antes de limpar, caso queeira recuperá-la mais tarde.
       </ConfirmationDialog>
       <ConfirmationDialog
         isOpen={showOverwriteConfirmation}

@@ -95,3 +95,10 @@ export interface Task {
 export type GroupedTasks = {
     [responsible: string]: Task[];
 };
+
+// --- Type for Webhooks ---
+export interface Webhook {
+  id: string;
+  name: string;
+  url: string;
+}

@@ -1,5 +1,5 @@
 import React, { useRef, useState, useEffect } from 'react';
-import { SparklesIcon, XIcon, UploadCloudIcon, SettingsIcon, PlusIcon, DownloadCloudIcon, EditIcon, ChevronLeftIcon, ChevronRightIcon, CalendarCheckIcon } from './icons';
+import { SparklesIcon, XIcon, UploadCloudIcon, SettingsIcon, PlusIcon, DownloadCloudIcon, EditIcon, ChevronLeftIcon, ChevronRightIcon, CalendarCheckIcon, SendIcon } from './icons';
 import type { AdminSettings, Empreendimento } from '../types';
 import SettingsPanel from './SettingsPanel';
 import CollapsibleSection from './CollapsibleSection';
@@ -29,6 +29,7 @@ interface InputFormProps {
   isEditing: boolean;
   onOpenLoadPanel: () => void;
   onOpenDeadlinePanel: () => void;
+  onOpenWebhookPanel: () => void;
   isAtaGenerated: boolean;
   isCollapsed: boolean;
   onToggleCollapse: () => void;
@@ -52,7 +53,7 @@ const FormInput: React.FC<{ label: string; id: string; value: string; onChange: 
 
 
 const InputForm: React.FC<InputFormProps> = (props) => {
-  const { onGenerate, onClear, isLoading, isEditing, vttContent, setVttContent, onOpenLoadPanel, onOpenDeadlinePanel, isAtaGenerated, isCollapsed, onToggleCollapse } = props;
+  const { onGenerate, onClear, isLoading, isEditing, vttContent, setVttContent, onOpenLoadPanel, onOpenDeadlinePanel, onOpenWebhookPanel, isAtaGenerated, isCollapsed, onToggleCollapse } = props;
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isMammothReady, setIsMammothReady] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -141,6 +142,14 @@ const InputForm: React.FC<InputFormProps> = (props) => {
           >
               <CalendarCheckIcon className="w-5 h-5 mr-2" />
               Prazos
+          </button>
+           <button 
+            onClick={onOpenWebhookPanel} 
+            title="Gerenciar webhooks do Microsoft Teams"
+            className="inline-flex items-center text-sm font-medium text-gray-600 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400"
+          >
+              <SendIcon className="w-5 h-5 mr-2" />
+              Webhooks
           </button>
           <button 
             onClick={onOpenLoadPanel} 

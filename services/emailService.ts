@@ -191,3 +191,226 @@ export const generateDailyBulletinHtml = (
     </html>
   `;
 };
+
+
+/**
+ * Generates a simplified, well-structured HTML string for direct pasting into Microsoft Teams.
+ * This version uses divs as "cards" and proper list formatting to ensure a clean layout.
+ * @param tasks - A list of all tasks.
+ * @param adminSettings - The current company settings for branding.
+ * @param empreendimentoFilter - Optional filter for empreendimento.
+ * @param responsavelFilter - Optional filter for responsavel.
+ * @returns An HTML string formatted for Teams.
+ */
+export const generateTeamsHtml = (
+  tasks: Task[],
+  adminSettings: AdminSettings | null,
+  empreendimentoFilter?: string,
+  responsavelFilter?: string
+): string => {
+  const today = new Date();
+  const todayStr = today.toLocaleDateString('pt-BR', { year: 'numeric', month: 'long', day: 'numeric' });
+
+  const tasksForBulletin = tasks.filter(task =>
+    (task.status === 'due-today' || task.status === 'overdue') && !task.completed
+  );
+
+  const groupedTasks = tasksForBulletin.reduce((acc: GroupedTasks, task) => {
+    const responsible = task.responsible || 'Não atribuído';
+    if (!acc[responsible]) {
+      acc[responsible] = [];
+    }
+    acc[responsible].push(task);
+    return acc;
+  }, {});
+  
+  const subtitleParts: string[] = [];
+  if (empreendimentoFilter && empreendimentoFilter !== 'all') {
+    subtitleParts.push(`<strong>Empreendimento:</strong> ${empreendimentoFilter}`);
+  }
+  if (responsavelFilter && responsavelFilter !== 'all') {
+    subtitleParts.push(`<strong>Responsável:</strong> ${responsavelFilter}`);
+  }
+
+  const subtitleText = subtitleParts.length > 0
+    ? `Filtros: ${subtitleParts.join(' | ')}`
+    : `Pendências até ${todayStr}`;
+  
+  let html = `<div><p><strong>Boletim Diário de Prazos</strong></p><p>${subtitleText}</p></div>`;
+
+  if (Object.keys(groupedTasks).length === 0) {
+    html += '<hr><p>Nenhuma pendência encontrada com os filtros selecionados.</p>';
+    return html;
+  }
+
+  let isFirstResponsible = true;
+  Object.entries(groupedTasks).forEach(([responsible, tasksForResponsible]) => {
+    if (!isFirstResponsible) {
+        html += '<hr>';
+    }
+    isFirstResponsible = false;
+
+    const taskCountText = `${tasksForResponsible.length} ${tasksForResponsible.length > 1 ? 'pendências' : 'pendência'}`;
+    html += `<p><strong>Responsável: ${responsible}</strong> (${taskCountText})</p>`;
+    
+    tasksForResponsible.forEach(task => {
+        const statusText = task.status === 'overdue' ? ' <font color="#A4262C"><strong>(ATRASADO)</strong></font>' : '';
+        
+        const descriptionLines = task.description.split('\n').filter(line => line.trim() !== '');
+        const taskTitle = descriptionLines.shift() || '';
+        
+        let descriptionDetails = '';
+        if (descriptionLines.length > 0) {
+            const listItems = descriptionLines.map(line => {
+                const cleanedLine = line.trim().replace(/^[-*o]\s*/, '');
+                return `<li>${cleanedLine}</li>`;
+            }).join('');
+            descriptionDetails = `<ul style="margin-top: 5px; margin-bottom: 5px; padding-left: 20px;">${listItems}</ul>`;
+        }
+
+        html += `
+            <div style="border: 1px solid #E1E1E1; border-radius: 6px; padding: 12px; margin-top: 8px; margin-bottom: 12px;">
+                <p style="margin: 0 0 5px 0;">
+                    <strong>${task.deadline}</strong>${statusText} - ${taskTitle}
+                </p>
+                ${descriptionDetails}
+                <p style="font-size: 90%; color: #606060; margin: 8px 0 0 0;">
+                    <em>Origem: ${task.sourceAta.empreendimento} / ${task.sourceAta.title} (${task.sourceAta.date})</em>
+                </p>
+            </div>
+        `;
+    });
+  });
+
+  return html;
+};
+
+/**
+ * Generates a Microsoft Teams Adaptive Card JSON payload for webhooks.
+ * @param tasks - A list of all tasks.
+ * @param adminSettings - The current company settings for branding.
+ * @param empreendimentoFilter - Optional filter for empreendimento.
+ * @param responsavelFilter - Optional filter for responsavel.
+ * @returns An object representing the Adaptive Card payload.
+ */
+export const generateTeamsAdaptiveCard = (
+  tasks: Task[],
+  adminSettings: AdminSettings | null,
+  empreendimentoFilter?: string,
+  responsavelFilter?: string
+): object => {
+  const today = new Date();
+  const todayStr = today.toLocaleDateString('pt-BR', { year: 'numeric', month: 'long', day: 'numeric' });
+
+  const tasksForBulletin = tasks.filter(task =>
+    (task.status === 'due-today' || task.status === 'overdue') && !task.completed
+  );
+
+  const groupedTasks = tasksForBulletin.reduce((acc: GroupedTasks, task) => {
+    const responsible = task.responsible || 'Não atribuído';
+    if (!acc[responsible]) acc[responsible] = [];
+    acc[responsible].push(task);
+    return acc;
+  }, {});
+
+  const subtitleParts: string[] = [];
+  if (empreendimentoFilter && empreendimentoFilter !== 'all') {
+    subtitleParts.push(`**Empreendimento:** ${empreendimentoFilter}`);
+  }
+  if (responsavelFilter && responsavelFilter !== 'all') {
+    subtitleParts.push(`**Responsável:** ${responsavelFilter}`);
+  }
+  const subtitleText = subtitleParts.length > 0
+    ? `Filtros: ${subtitleParts.join(' | ')}`
+    : `Pendências até ${todayStr}`;
+  
+  const cardBody: any[] = [
+    {
+      type: 'TextBlock',
+      text: 'Boletim Diário de Prazos',
+      size: 'large',
+      weight: 'bolder',
+      wrap: true,
+    },
+    {
+      type: 'TextBlock',
+      text: subtitleText,
+      wrap: true,
+      isSubtle: true,
+    }
+  ];
+
+  if (Object.keys(groupedTasks).length === 0) {
+    cardBody.push({
+      type: 'TextBlock',
+      text: 'Nenhuma pendência encontrada com os filtros selecionados.',
+      wrap: true,
+      spacing: 'large',
+    });
+  } else {
+    Object.entries(groupedTasks).forEach(([responsible, tasksForResponsible], index) => {
+      cardBody.push({
+        type: 'Container',
+        style: 'emphasis',
+        spacing: index === 0 ? 'large' : 'default',
+        items: [
+          {
+            type: 'TextBlock',
+            text: `**${responsible}** (${tasksForResponsible.length} ${tasksForResponsible.length > 1 ? 'pendências' : 'pendência'})`,
+            wrap: true,
+            size: 'medium',
+            weight: 'bolder',
+          }
+        ]
+      });
+
+      tasksForResponsible.forEach(task => {
+        const statusText = task.status === 'overdue' 
+          ? `(ATRASADO) 🔴` 
+          : `(ENTREGA HOJE) 🟠`;
+        
+        const descriptionLines = task.description.split('\n').filter(line => line.trim() !== '');
+        const taskTitle = descriptionLines.shift() || 'Tarefa sem descrição';
+
+        let descriptionDetails = '';
+        if (descriptionLines.length > 0) {
+            descriptionDetails = '- ' + descriptionLines.map(line => line.trim().replace(/^[-*o]\s*/, '')).join('\n- ');
+        }
+
+        cardBody.push({
+          type: 'Container',
+          spacing: 'small',
+          separator: true,
+          items: [
+            {
+              type: 'FactSet',
+              facts: [
+                { title: 'Prazo:', value: `${task.deadline}` },
+                { title: 'Status:', value: `**${statusText}**` },
+                { title: 'Tarefa:', value: taskTitle },
+                ...(descriptionDetails ? [{ title: 'Detalhes:', value: descriptionDetails }] : []),
+                { title: 'Origem:', value: `${task.sourceAta.empreendimento} / ${task.sourceAta.title} (${task.sourceAta.date})` }
+              ]
+            }
+          ]
+        });
+      });
+    });
+  }
+
+  return {
+    type: 'message',
+    attachments: [
+      {
+        contentType: 'application/vnd.microsoft.card.adaptive',
+        contentUrl: null,
+        content: {
+          $schema: 'http://adaptivecards.io/schemas/adaptive-card.json',
+          type: 'AdaptiveCard',
+          version: '1.4',
+          body: cardBody,
+        },
+      },
+    ],
+  };
+};

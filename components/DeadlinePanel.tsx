@@ -1,16 +1,17 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import type { AtaData, Task, GroupedTasks, AdminSettings } from '../types';
-// FIX: Import `getTaskStatus` to resolve reference error.
+import type { AtaData, Task, GroupedTasks, AdminSettings, Webhook } from '../types';
 import { getAllTasks, groupTasksByResponsible, getTaskStatus } from '../services/taskService';
 import { saveAtaToFirebase } from '../services/firebaseService';
-import { generateDailyBulletinHtml } from '../services/emailService';
-import { XIcon, AlertTriangleIcon, CalendarCheckIcon, ChevronRightIcon, ExternalLinkIcon, SparklesIcon, CopyIcon, CheckIcon } from './icons';
+import { generateDailyBulletinHtml, generateTeamsHtml, generateTeamsAdaptiveCard } from '../services/emailService';
+import { sendToTeamsWebhook } from '../services/webhookService';
+import { XIcon, AlertTriangleIcon, CalendarCheckIcon, ChevronRightIcon, ExternalLinkIcon, SparklesIcon, CopyIcon, CheckIcon, UsersIcon, SendIcon } from './icons';
 
 interface DeadlinePanelProps {
   isOpen: boolean;
   onClose: () => void;
   onSelectAta: (ata: AtaData) => void;
   adminSettings: AdminSettings | null;
+  webhooks: Webhook[];
 }
 
 const statusStyles = {
@@ -54,70 +55,166 @@ const convertToDisplayDate = (inputDate: string): string => {
     return inputDate;
 };
 
+// FIX: Define a type alias for the send status object to avoid type inference issues.
+type SendStatusInfo = {
+    status: 'idle' | 'sending' | 'success' | 'error';
+    message: string;
+};
 
-const EmailPreviewModal: React.FC<{
+const BulletinPreviewModal: React.FC<{
     isOpen: boolean;
     onClose: () => void;
     htmlContent: string;
+    teamsHtmlContent: string;
+    adaptiveCardPayload: object;
+    webhooks: Webhook[];
     subject: string;
-}> = ({ isOpen, onClose, htmlContent, subject }) => {
-    const [copied, setCopied] = useState(false);
+}> = ({ isOpen, onClose, htmlContent, teamsHtmlContent, adaptiveCardPayload, webhooks, subject }) => {
+    const [copiedHtml, setCopiedHtml] = useState(false);
+    const [copiedTeams, setCopiedTeams] = useState(false);
+    const [activeTab, setActiveTab] = useState<'email' | 'teams'>('email');
+    const [selectedWebhooks, setSelectedWebhooks] = useState<Record<string, boolean>>({});
+    const [sendStatuses, setSendStatuses] = useState<Record<string, SendStatusInfo>>({});
+
+    useEffect(() => {
+        // Reset state when modal is opened/closed or content changes
+        if(isOpen) {
+            setActiveTab('email');
+            setCopiedHtml(false);
+            setCopiedTeams(false);
+            setSendStatuses({});
+            // Pre-select all webhooks by default
+            const initialSelection = webhooks.reduce((acc, webhook) => {
+                acc[webhook.id] = true;
+                return acc;
+            }, {} as Record<string, boolean>);
+            setSelectedWebhooks(initialSelection);
+        }
+    }, [isOpen, webhooks]);
 
     if (!isOpen) return null;
 
-    const handleCopyToClipboard = async () => {
+    const handleCopyHtmlToClipboard = async () => {
         try {
-            // Use the Clipboard API to write HTML for rich text pasting
             const blob = new Blob([htmlContent], { type: 'text/html' });
             const clipboardItem = new ClipboardItem({ 'text/html': blob });
             await navigator.clipboard.write([clipboardItem]);
-            
-            setCopied(true);
-            setTimeout(() => setCopied(false), 2500);
+            setCopiedHtml(true);
+            setTimeout(() => setCopiedHtml(false), 2500);
         } catch (err) {
             console.error('Failed to copy HTML to clipboard:', err);
             alert('Falha ao copiar. Por favor, tente copiar o conteúdo manualmente.');
         }
     };
 
+    const handleCopyTeamsToClipboard = async () => {
+        if (!teamsHtmlContent) return;
+        try {
+            const blob = new Blob([teamsHtmlContent], { type: 'text/html' });
+            const clipboardItem = new ClipboardItem({ 'text/html': blob });
+            await navigator.clipboard.write([clipboardItem]);
+            setCopiedTeams(true);
+            setTimeout(() => setCopiedTeams(false), 2500);
+        } catch (err) {
+            console.error('Failed to copy Teams HTML to clipboard:', err);
+            alert('Falha ao copiar HTML para o Teams.');
+        }
+    };
+    
+    const handleSendToTeams = async () => {
+        const webhooksToSend = webhooks.filter(w => selectedWebhooks[w.id]);
+        if (webhooksToSend.length === 0) {
+            alert('Selecione pelo menos um webhook para enviar.');
+            return;
+        }
+
+        const initialStatuses: Record<string, SendStatusInfo> = {};
+        webhooksToSend.forEach(w => {
+            initialStatuses[w.id] = { status: 'sending', message: 'Enviando...' };
+        });
+        setSendStatuses(initialStatuses);
+
+        for (const webhook of webhooksToSend) {
+            const result = await sendToTeamsWebhook(webhook.url, adaptiveCardPayload);
+            setSendStatuses(prev => ({
+                ...prev,
+                [webhook.id]: {
+                    status: result.success ? 'success' : 'error',
+                    message: result.message
+                }
+            }));
+        }
+    };
+
+    // FIX: Add type annotation to `s` to resolve error when accessing `s.status`.
+    const isSending = Object.values(sendStatuses).some((s: SendStatusInfo) => s.status === 'sending');
+
     return (
         <div className="fixed inset-0 bg-black bg-opacity-70 z-50 flex items-center justify-center p-4" onClick={onClose}>
             <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl w-full max-w-4xl flex flex-col h-[90vh]" onClick={(e) => e.stopPropagation()}>
                 <div className="flex justify-between items-center p-4 border-b border-gray-200 dark:border-gray-700">
-                    <h3 className="text-lg font-bold text-gray-800 dark:text-gray-100">Pré-visualização do Boletim Diário</h3>
-                    <button onClick={onClose} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"><XIcon className="w-6 h-6" /></button>
+                    <h3 className="text-lg font-bold text-gray-800 dark:text-gray-100">Pré-visualização e Envio do Boletim</h3>
+                     <button onClick={onClose} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"><XIcon className="w-6 h-6" /></button>
                 </div>
-                <div className="p-4 bg-gray-200 dark:bg-gray-900 text-sm font-mono rounded-t-md">
-                    <p><span className="font-semibold text-gray-600 dark:text-gray-400">Para:</span> agabriengenharia@gmail.com</p>
-                    <p><span className="font-semibold text-gray-600 dark:text-gray-400">Assunto:</span> {subject}</p>
+                
+                 <div className="flex border-b border-gray-200 dark:border-gray-700">
+                    <button onClick={() => setActiveTab('email')} className={`px-4 py-3 text-sm font-semibold ${activeTab === 'email' ? 'border-b-2 border-blue-600 text-blue-600' : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'}`}>Email</button>
+                    <button onClick={() => setActiveTab('teams')} className={`px-4 py-3 text-sm font-semibold ${activeTab === 'teams' ? 'border-b-2 border-blue-600 text-blue-600' : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'}`}>Microsoft Teams</button>
                 </div>
-                <iframe srcDoc={htmlContent} title="Email Preview" className="w-full flex-grow border-0" />
-                <div className="bg-gray-50 dark:bg-gray-800/50 px-6 py-4 flex justify-between items-center rounded-b-xl">
-                    <p className="text-xs text-gray-500 dark:text-gray-400 max-w-xs">
-                        Clique em "Copiar Boletim" e cole no corpo do seu e-mail para manter a formatação profissional.
-                    </p>
-                    <div className="flex flex-row-reverse gap-3">
-                         <button
-                            type="button"
-                            className="inline-flex justify-center rounded-md border border-gray-300 dark:border-gray-600 shadow-sm px-4 py-2 bg-white dark:bg-gray-700 text-base font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-600"
-                            onClick={onClose}
-                        >
-                            Fechar
-                        </button>
-                        <button
-                            type="button"
-                            onClick={handleCopyToClipboard}
-                            className={`inline-flex items-center justify-center rounded-md border shadow-sm px-4 py-2 text-base font-medium focus:outline-none focus:ring-2 focus:ring-offset-2 dark:focus:ring-offset-gray-800 transition-colors ${
-                                copied 
-                                ? 'bg-green-600 hover:bg-green-700 border-transparent text-white focus:ring-green-500' 
-                                : 'bg-blue-600 hover:bg-blue-700 border-transparent text-white focus:ring-blue-500'
-                            }`}
-                        >
-                            {copied ? <CheckIcon className="w-5 h-5 mr-2" /> : <CopyIcon className="w-5 h-5 mr-2" />}
-                            {copied ? 'Copiado!' : 'Copiar Boletim'}
-                        </button>
-                    </div>
-                </div>
+
+                {activeTab === 'email' && (
+                    <>
+                        <div className="p-4 bg-gray-200 dark:bg-gray-900 text-sm font-mono rounded-t-md">
+                            <p><span className="font-semibold text-gray-600 dark:text-gray-400">Assunto:</span> {subject}</p>
+                        </div>
+                        <iframe srcDoc={htmlContent} title="Email Preview" className="w-full flex-grow border-0" />
+                        <div className="bg-gray-50 dark:bg-gray-800/50 px-6 py-4 flex justify-between items-center border-t border-gray-200 dark:border-gray-700 rounded-b-xl">
+                            <p className="text-xs text-gray-500 dark:text-gray-400 max-w-xs">Use "Copiar para Email" para colar em clientes como Outlook, e "Copiar para Teams" para colar em chats.</p>
+                             <div className="flex flex-row-reverse gap-3">
+                                <button onClick={onClose} className="inline-flex justify-center rounded-md border border-gray-300 dark:border-gray-600 shadow-sm px-4 py-2 bg-white dark:bg-gray-700 text-base font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-600">Fechar</button>
+                                <button onClick={handleCopyTeamsToClipboard} className={`inline-flex items-center justify-center rounded-md border shadow-sm px-4 py-2 text-base font-medium ${copiedTeams ? 'bg-green-600 text-white' : 'bg-purple-600 text-white hover:bg-purple-700'}`}><UsersIcon className="w-5 h-5 mr-2" />{copiedTeams ? 'Copiado!' : 'Copiar para Teams'}</button>
+                                <button onClick={handleCopyHtmlToClipboard} className={`inline-flex items-center justify-center rounded-md border shadow-sm px-4 py-2 text-base font-medium ${copiedHtml ? 'bg-green-600 text-white' : 'bg-blue-600 text-white hover:bg-blue-700'}`}><CopyIcon className="w-5 h-5 mr-2" />{copiedHtml ? 'Copiado!' : 'Copiar para Email'}</button>
+                            </div>
+                        </div>
+                    </>
+                )}
+                {activeTab === 'teams' && (
+                     <>
+                        <div className="flex-grow p-6 overflow-y-auto">
+                            <h4 className="font-bold text-gray-800 dark:text-gray-200 mb-2">Enviar para Canais do Teams</h4>
+                            <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">Selecione os canais para onde deseja enviar este boletim como um Cartão Adaptável.</p>
+                            <div className="space-y-2 max-h-80 overflow-y-auto pr-2 -mr-2 border-t border-b py-4 dark:border-gray-700">
+                                {/* FIX: Refactor map to use a variable for the status object to help TypeScript with type inference. */}
+                                {webhooks.length > 0 ? webhooks.map(webhook => {
+                                    const statusInfo = sendStatuses[webhook.id];
+                                    return (
+                                        <label key={webhook.id} htmlFor={`webhook-${webhook.id}`} className="flex items-center p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700">
+                                            <input id={`webhook-${webhook.id}`} type="checkbox" checked={!!selectedWebhooks[webhook.id]} onChange={e => setSelectedWebhooks(prev => ({...prev, [webhook.id]: e.target.checked}))} className="h-5 w-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
+                                            <span className="ml-3 text-sm font-medium text-gray-800 dark:text-gray-200">{webhook.name}</span>
+                                            {statusInfo && (
+                                                 <span className={`ml-auto text-xs font-bold px-2 py-0.5 rounded-full ${
+                                                     statusInfo.status === 'sending' ? 'bg-blue-100 text-blue-800' :
+                                                     statusInfo.status === 'success' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                                                 }`}>{statusInfo.status === 'sending' ? 'Enviando...' : statusInfo.status === 'success' ? 'Enviado!' : 'Erro!'}</span>
+                                            )}
+                                        </label>
+                                    );
+                                }) : <p className="text-center text-sm text-gray-500 dark:text-gray-400 py-4">Nenhum webhook configurado. Adicione webhooks no painel de configurações.</p>}
+                            </div>
+                            {/* FIX: Add type annotation to `status` to resolve error when accessing `status.status`. */}
+                            {Object.values(sendStatuses).map((status: SendStatusInfo, i) => (
+                                status.status === 'error' ? <p key={i} className="text-xs text-red-600 mt-2">{status.message}</p> : null
+                            ))}
+                        </div>
+                         <div className="bg-gray-50 dark:bg-gray-800/50 px-6 py-4 flex justify-end items-center gap-3 border-t border-gray-200 dark:border-gray-700 rounded-b-xl">
+                            <button onClick={onClose} className="inline-flex justify-center rounded-md border border-gray-300 dark:border-gray-600 shadow-sm px-4 py-2 bg-white dark:bg-gray-700 text-base font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-600">Fechar</button>
+                            <button onClick={handleSendToTeams} disabled={isSending || webhooks.length === 0} className="inline-flex items-center justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-blue-600 text-base font-medium text-white hover:bg-blue-700 disabled:bg-blue-400 disabled:cursor-not-allowed">
+                                {isSending ? <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div> : <SendIcon className="w-5 h-5 mr-2" />}
+                                {isSending ? 'Enviando...' : `Enviar para (${Object.values(selectedWebhooks).filter(Boolean).length}) Canal(is)`}
+                            </button>
+                        </div>
+                    </>
+                )}
             </div>
         </div>
     );
@@ -205,13 +302,15 @@ const BulletinFilterModal: React.FC<{
 };
 
 
-const DeadlinePanel: React.FC<DeadlinePanelProps> = ({ isOpen, onClose, onSelectAta, adminSettings }) => {
+const DeadlinePanel: React.FC<DeadlinePanelProps> = ({ isOpen, onClose, onSelectAta, adminSettings, webhooks }) => {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [expandedKeys, setExpandedKeys] = useState<Record<string, boolean>>({});
-  const [showEmailPreview, setShowEmailPreview] = useState(false);
+  const [showBulletinPreview, setShowBulletinPreview] = useState(false);
   const [emailHtml, setEmailHtml] = useState('');
+  const [teamsHtml, setTeamsHtml] = useState('');
+  const [adaptiveCard, setAdaptiveCard] = useState<object>({});
   const [showCompleted, setShowCompleted] = useState(true);
   const [isBulletinModalOpen, setIsBulletinModalOpen] = useState(false);
   const [selectedEmpreendimento, setSelectedEmpreendimento] = useState<string>('all');
@@ -303,7 +402,7 @@ const DeadlinePanel: React.FC<DeadlinePanelProps> = ({ isOpen, onClose, onSelect
     setExpandedKeys(prev => ({ ...prev, [key]: !prev[key] }));
   };
   
-  const handleGenerateEmail = () => {
+  const handleGenerateBulletin = () => {
     let filteredTasks = tasks;
     if (selectedEmpreendimento !== 'all') {
         filteredTasks = filteredTasks.filter(task => task.sourceAta.empreendimento === selectedEmpreendimento);
@@ -313,8 +412,12 @@ const DeadlinePanel: React.FC<DeadlinePanelProps> = ({ isOpen, onClose, onSelect
     }
 
     const html = generateDailyBulletinHtml(filteredTasks, adminSettings, selectedEmpreendimento, selectedResponsavel);
+    const teamsFriendlyHtml = generateTeamsHtml(filteredTasks, adminSettings, selectedEmpreendimento, selectedResponsavel);
+    const cardPayload = generateTeamsAdaptiveCard(filteredTasks, adminSettings, selectedEmpreendimento, selectedResponsavel);
     setEmailHtml(html);
-    setShowEmailPreview(true);
+    setTeamsHtml(teamsFriendlyHtml);
+    setAdaptiveCard(cardPayload);
+    setShowBulletinPreview(true);
     setIsBulletinModalOpen(false); // Close filter modal after generating
   };
 
@@ -443,7 +546,7 @@ const DeadlinePanel: React.FC<DeadlinePanelProps> = ({ isOpen, onClose, onSelect
       <BulletinFilterModal
         isOpen={isBulletinModalOpen}
         onClose={() => setIsBulletinModalOpen(false)}
-        onGenerate={handleGenerateEmail}
+        onGenerate={handleGenerateBulletin}
         empreendimentos={uniqueEmpreendimentos}
         responsaveis={uniqueResponsaveis}
         selectedEmpreendimento={selectedEmpreendimento}
@@ -451,7 +554,15 @@ const DeadlinePanel: React.FC<DeadlinePanelProps> = ({ isOpen, onClose, onSelect
         selectedResponsavel={selectedResponsavel}
         setSelectedResponsavel={setSelectedResponsavel}
       />
-      <EmailPreviewModal isOpen={showEmailPreview} onClose={() => setShowEmailPreview(false)} htmlContent={emailHtml} subject={emailSubject} />
+      <BulletinPreviewModal 
+        isOpen={showBulletinPreview} 
+        onClose={() => setShowBulletinPreview(false)} 
+        htmlContent={emailHtml} 
+        teamsHtmlContent={teamsHtml}
+        adaptiveCardPayload={adaptiveCard}
+        webhooks={webhooks}
+        subject={emailSubject} 
+      />
     </>
   );
 };
