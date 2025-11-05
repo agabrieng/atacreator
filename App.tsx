@@ -11,7 +11,7 @@ import ConfirmationDialog from './components/ConfirmationDialog';
 import SavedAtasPanel from './components/SavedAtasPanel';
 import ProjectManagementPanel from './components/ProjectManagementPanel';
 import DeadlinePanel from './components/DeadlinePanel';
-import { AlertTriangleIcon, EditIcon, CheckIcon, CopyIcon, UploadCloudIcon, DownloadCloudIcon, FilePdfIcon } from './components/icons';
+import { AlertTriangleIcon, EditIcon, CheckIcon, CopyIcon, UploadCloudIcon, DownloadCloudIcon, FilePdfIcon, CheckCircleIcon, XIcon } from './components/icons';
 
 const DEFAULT_COMPANY_NAME = "Minha Empresa";
 const DEFAULT_SETTINGS: AdminSettings = {
@@ -38,6 +38,44 @@ const ActionButton: React.FC<{
         {children}
     </button>
 );
+
+// Toast Component for feedback
+interface ToastProps {
+  message: string;
+  type: 'success' | 'error';
+  onClose: () => void;
+}
+
+const Toast: React.FC<ToastProps> = ({ message, type, onClose }) => {
+  const isSuccess = type === 'success';
+
+  const bgColor = isSuccess ? 'bg-green-100 dark:bg-green-900/95' : 'bg-red-100 dark:bg-red-900/95';
+  const borderColor = isSuccess ? 'border-green-400 dark:border-green-700' : 'border-red-400 dark:border-red-700';
+  const textColor = isSuccess ? 'text-green-800 dark:text-green-100' : 'text-red-800 dark:text-red-100';
+  const Icon = isSuccess ? CheckCircleIcon : AlertTriangleIcon;
+  const iconColor = isSuccess ? 'text-green-500 dark:text-green-400' : 'text-red-500 dark:text-red-400';
+
+  return (
+    <div className="fixed top-8 right-8 z-50 animate-fade-in-down" role="alert">
+      <div className={`flex items-center p-4 rounded-lg shadow-lg border ${bgColor} ${borderColor} ${textColor}`}>
+        <div className="flex-shrink-0">
+          <Icon className={`w-6 h-6 ${iconColor}`} />
+        </div>
+        <div className="ml-3">
+          <p className="text-sm font-medium">{message}</p>
+        </div>
+        <div className="ml-auto pl-3">
+          <div className="-mx-1.5 -my-1.5">
+            <button onClick={onClose} className={`inline-flex rounded-md p-1.5 focus:outline-none focus:ring-2 focus:ring-offset-2 ${isSuccess ? 'hover:bg-green-200/50 dark:hover:bg-green-800/50 focus:ring-green-600 focus:ring-offset-green-100 dark:focus:ring-offset-green-900' : 'hover:bg-red-200/50 dark:hover:bg-red-800/50 focus:ring-red-600 focus:ring-offset-red-100 dark:focus:ring-offset-red-900'}`}>
+              <span className="sr-only">Fechar</span>
+              <XIcon className="h-5 w-5" />
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
 
 
 const App: React.FC = () => {
@@ -70,7 +108,6 @@ const App: React.FC = () => {
   const [copied, setCopied] = useState(false);
   const [isExportReady, setIsExportReady] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
-  const [saveSuccess, setSaveSuccess] = useState(false);
   
   // State for loading saved atas
   const [savedAtas, setSavedAtas] = useState<AtaData[]>([]);
@@ -92,6 +129,9 @@ const App: React.FC = () => {
 
   // State for Deadline Panel
   const [isDeadlinePanelOpen, setIsDeadlinePanelOpen] = useState(false);
+
+  // State for Toast notifications
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
 
   useEffect(() => {
@@ -174,6 +214,13 @@ const App: React.FC = () => {
             }
         }
     }, [empreendimento, empreendimentos]);
+    
+    useEffect(() => {
+        if (toast) {
+            const timer = setTimeout(() => setToast(null), 4000);
+            return () => clearTimeout(timer);
+        }
+    }, [toast]);
 
   const handleSettingsSave = useCallback((profiles: Record<string, AdminSettings>, currentCompany: string) => {
     setCompanyProfiles(profiles);
@@ -309,7 +356,7 @@ const App: React.FC = () => {
         if (err.message === 'API_KEY_MISSING') {
             errorMessage = 'A chave de API não foi encontrada. Verifique se a variável de ambiente API_KEY está configurada no seu ambiente de produção.';
         } else if (err.message.includes('API key not valid')) {
-            errorMessage = 'A chave de API fornecida não é válida. Por favor, verifique a variável de ambiente API_KEY nas configurações de implantação do seu serviço e tente novamente.';
+            errorMessage = 'A chave de API do Gemini (configurada na variável de ambiente API_KEY) não é válida. Verifique se a chave está correta e se não foi confundida com a chave do Firebase. A chave para a API do Gemini é diferente e deve ser obtida no Google AI Studio.';
         }
       }
       setError(errorMessage);
@@ -355,20 +402,17 @@ const App: React.FC = () => {
   const handleSave = useCallback(async () => {
     if (!ata) return;
     setIsSaving(true);
-    setSaveSuccess(false);
     try {
       const docId = await saveAtaToFirebase(ata);
       const savedAta = { ...ata, id: docId };
       setAta(savedAta);
-      // If we just updated a loaded ata, update the original state to prevent repeated warnings
       if (originalLoadedAta) {
           setOriginalLoadedAta(savedAta);
       }
-      setSaveSuccess(true);
-      setTimeout(() => setSaveSuccess(false), 2500);
+      setToast({ message: 'Ata salva com sucesso na nuvem!', type: 'success' });
     } catch (error) {
       console.error("Erro ao salvar a ata no Firebase:", error);
-      alert("Ocorreu um erro ao salvar a ata no Firebase. Verifique o console para mais detalhes.");
+      setToast({ message: 'Erro ao salvar a ata. Tente novamente.', type: 'error' });
     } finally {
       setIsSaving(false);
     }
@@ -554,9 +598,15 @@ const App: React.FC = () => {
                         onClick={handleSave}
                         disabled={isEditing || isSaving}
                         title={isEditing ? "Conclua a edição para poder salvar" : "Salvar na nuvem"}
-                        className={`bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-200 border border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600 focus:ring-blue-500 ${saveSuccess ? 'border-green-500' : ''}`}
+                        className="bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-200 border border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600 focus:ring-blue-500"
                     >
-                        {saveSuccess ? <CheckIcon className="w-5 h-5 text-green-500" /> : <UploadCloudIcon className="w-5 h-5" />}
+                        {isSaving ? (
+                            <div className="w-5 h-5 border-2 border-current border-t-transparent rounded-full animate-spin" role="status">
+                                <span className="sr-only">Salvando...</span>
+                            </div>
+                        ) : (
+                            <UploadCloudIcon className="w-5 h-5" />
+                        )}
                         <span>{isSaving ? 'Salvando...' : 'Salvar na Nuvem'}</span>
                     </ActionButton>
                     <div className="flex-grow"></div>
@@ -577,6 +627,7 @@ const App: React.FC = () => {
           </div>
         </div>
       </main>
+      {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
       <SavedAtasPanel
         isOpen={showLoadPanel}
         isLoading={isSavedAtasLoading}

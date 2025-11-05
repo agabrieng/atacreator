@@ -1,15 +1,15 @@
-import { initializeApp } from 'firebase/app';
-import {
-  getFirestore,
-  collection,
-  getDocs,
-  addDoc,
-  updateDoc,
-  deleteDoc,
-  doc,
-  query,
-  orderBy,
-} from 'firebase/firestore';
+import { initializeApp } from "firebase/app";
+import { 
+    getFirestore, 
+    collection, 
+    getDocs, 
+    addDoc, 
+    doc, 
+    updateDoc, 
+    deleteDoc,
+    query,
+    orderBy 
+} from "firebase/firestore";
 import type { AtaData, Empreendimento } from '../types';
 
 // As credenciais da conta de serviço não devem ser usadas no cliente.
@@ -23,18 +23,25 @@ const firebaseConfig = {
   appId: "1:591942023537:web:8625d506a74a4ed8310e53"
 };
 
+console.warn(
+    "Atenção: A configuração do Firebase está usando a variável de ambiente API_KEY, que também é usada pela API do Gemini. " +
+    "A chave de API da Web do Firebase geralmente é diferente da chave secreta da API do Gemini. " +
+    "Verifique se o uso compartilhado está correto para a sua configuração."
+);
+
+
 // Inicializa o Firebase
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
-const empreendimentosCollection = collection(db, 'empreendimentos');
-const atasCollection = collection(db, 'atas');
+const empreendimentosCollectionRef = collection(db, 'empreendimentos');
+const atasCollectionRef = collection(db, 'atas');
 
 // --- Empreendimentos (Projetos) ---
 
 export const getEmpreendimentos = async (): Promise<Empreendimento[]> => {
   try {
-    const q = query(empreendimentosCollection, orderBy('name'));
+    const q = query(empreendimentosCollectionRef, orderBy('name'));
     const querySnapshot = await getDocs(q);
     return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Empreendimento));
   } catch (error) {
@@ -45,7 +52,7 @@ export const getEmpreendimentos = async (): Promise<Empreendimento[]> => {
 
 export const addEmpreendimento = async (name: string, contrato: string): Promise<string> => {
   try {
-    const docRef = await addDoc(empreendimentosCollection, { name, contrato });
+    const docRef = await addDoc(empreendimentosCollectionRef, { name, contrato });
     return docRef.id;
   } catch (error) {
     console.error("Erro ao adicionar empreendimento ao Firebase: ", error);
@@ -86,7 +93,7 @@ export const saveAtaToFirebase = async (ataData: AtaData): Promise<string> => {
       return id;
     } else {
       // Cria novo documento
-      const docRef = await addDoc(atasCollection, dataToSave);
+      const docRef = await addDoc(atasCollectionRef, dataToSave);
       return docRef.id;
     }
   } catch (error) {
@@ -99,7 +106,7 @@ export const saveAtaToFirebase = async (ataData: AtaData): Promise<string> => {
 export const loadAtasFromFirebase = async (): Promise<AtaData[]> => {
     try {
         // Query simples; a ordenação pode ser adicionada se um campo de data/hora for incluído nos dados.
-        const querySnapshot = await getDocs(atasCollection);
+        const querySnapshot = await getDocs(atasCollectionRef);
         return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as AtaData));
     } catch (error) {
         console.error("Erro ao carregar atas do Firebase: ", error);
