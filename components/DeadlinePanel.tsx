@@ -231,7 +231,13 @@ const BulletinFilterModal: React.FC<{
     setSelectedAssunto: (value: string) => void;
     selectedResponsavel: string;
     setSelectedResponsavel: (value: string) => void;
-}> = ({ isOpen, onClose, onGenerate, empreendimentos, assuntos, responsaveis, selectedEmpreendimento, setSelectedEmpreendimento, selectedAssunto, setSelectedAssunto, selectedResponsavel, setSelectedResponsavel }) => {
+    selectedPeriod: string;
+    setSelectedPeriod: (value: string) => void;
+    customStartDate: string;
+    setCustomStartDate: (value: string) => void;
+    customEndDate: string;
+    setCustomEndDate: (value: string) => void;
+}> = ({ isOpen, onClose, onGenerate, empreendimentos, assuntos, responsaveis, selectedEmpreendimento, setSelectedEmpreendimento, selectedAssunto, setSelectedAssunto, selectedResponsavel, setSelectedResponsavel, selectedPeriod, setSelectedPeriod, customStartDate, setCustomStartDate, customEndDate, setCustomEndDate }) => {
     if (!isOpen) return null;
 
     return (
@@ -248,6 +254,47 @@ const BulletinFilterModal: React.FC<{
                         </button>
                     </div>
                     <div className="mt-4 space-y-4">
+                        <div>
+                            <label htmlFor="period-filter" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                                Filtrar por Período do Prazo
+                            </label>
+                            <select
+                                id="period-filter"
+                                value={selectedPeriod}
+                                onChange={(e) => setSelectedPeriod(e.target.value)}
+                                className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md"
+                            >
+                                <option value="today">Até a data de hoje</option>
+                                <option value="current_week">Semana atual</option>
+                                <option value="next_week">Próxima semana</option>
+                                <option value="current_month">Mês atual</option>
+                                <option value="custom">Personalizado</option>
+                            </select>
+                        </div>
+                        {selectedPeriod === 'custom' && (
+                            <div className="flex items-center gap-2">
+                                <div className="flex-1">
+                                    <label htmlFor="start-date" className="block text-xs font-medium text-gray-500 dark:text-gray-400">De</label>
+                                    <input
+                                        type="date"
+                                        id="start-date"
+                                        value={customStartDate}
+                                        onChange={(e) => setCustomStartDate(e.target.value)}
+                                        className="mt-1 block w-full pl-3 pr-1 py-2 text-base border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md"
+                                    />
+                                </div>
+                                <div className="flex-1">
+                                    <label htmlFor="end-date" className="block text-xs font-medium text-gray-500 dark:text-gray-400">Até</label>
+                                    <input
+                                        type="date"
+                                        id="end-date"
+                                        value={customEndDate}
+                                        onChange={(e) => setCustomEndDate(e.target.value)}
+                                        className="mt-1 block w-full pl-3 pr-1 py-2 text-base border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md"
+                                    />
+                                </div>
+                            </div>
+                        )}
                         <div>
                             <label htmlFor="empreendimento-filter" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
                                 Filtrar por Empreendimento
@@ -291,7 +338,7 @@ const BulletinFilterModal: React.FC<{
                             </select>
                         </div>
                         <p className="text-xs text-gray-500 dark:text-gray-400 pt-2">
-                            O boletim incluirá tarefas com status 'Atrasado' ou 'Entrega Hoje' que não foram concluídas, com base nos filtros selecionados.
+                           O boletim incluirá tarefas não concluídas que correspondam aos filtros de período, empreendimento, assunto e responsável selecionados.
                         </p>
                     </div>
                 </div>
@@ -331,6 +378,9 @@ const DeadlinePanel: React.FC<DeadlinePanelProps> = ({ isOpen, onClose, onSelect
   const [selectedEmpreendimento, setSelectedEmpreendimento] = useState<string>('all');
   const [selectedAssunto, setSelectedAssunto] = useState<string>('all');
   const [selectedResponsavel, setSelectedResponsavel] = useState<string>('all');
+  const [selectedPeriod, setSelectedPeriod] = useState<string>('today');
+  const [customStartDate, setCustomStartDate] = useState('');
+  const [customEndDate, setCustomEndDate] = useState('');
 
 
   const fetchAndSetTasks = async () => {
@@ -467,20 +517,105 @@ const DeadlinePanel: React.FC<DeadlinePanelProps> = ({ isOpen, onClose, onSelect
   };
   
   const handleGenerateBulletin = () => {
-    let filteredTasks = tasks;
+    let filteredTasksByProps = tasks;
     if (selectedEmpreendimento !== 'all') {
-        filteredTasks = filteredTasks.filter(task => task.sourceAta.empreendimento === selectedEmpreendimento);
+        filteredTasksByProps = filteredTasksByProps.filter(task => task.sourceAta.empreendimento === selectedEmpreendimento);
     }
     if (selectedAssunto !== 'all') {
-        filteredTasks = filteredTasks.filter(task => task.sourceAta.assunto === selectedAssunto);
+        filteredTasksByProps = filteredTasksByProps.filter(task => task.sourceAta.assunto === selectedAssunto);
     }
     if (selectedResponsavel !== 'all') {
-        filteredTasks = filteredTasks.filter(task => task.responsible === selectedResponsavel);
+        filteredTasksByProps = filteredTasksByProps.filter(task => task.responsible === selectedResponsavel);
     }
 
-    const html = generateDailyBulletinHtml(filteredTasks, adminSettings, selectedEmpreendimento, selectedAssunto, selectedResponsavel);
-    const teamsFriendlyHtml = generateTeamsHtml(filteredTasks, adminSettings, selectedEmpreendimento, selectedAssunto, selectedResponsavel);
-    const cardPayload = generateTeamsAdaptiveCard(filteredTasks, adminSettings, selectedEmpreendimento, selectedAssunto, selectedResponsavel);
+    let tasksForBulletin = filteredTasksByProps.filter(task => !task.completed);
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const getWeekRange = (date: Date) => {
+        const start = new Date(date);
+        const day = start.getDay();
+        const diff = start.getDate() - day + (day === 0 ? -6 : 1); 
+        start.setDate(diff);
+        start.setHours(0, 0, 0, 0);
+
+        const end = new Date(start);
+        end.setDate(start.getDate() + 6);
+        end.setHours(23, 59, 59, 999);
+        return { start, end };
+    };
+    
+    const parseDateInput = (dateStr: string): Date | null => {
+        if (!dateStr) return null;
+        const [year, month, day] = dateStr.split('-').map(Number);
+        if (year && month && day) {
+            return new Date(year, month - 1, day);
+        }
+        return null;
+    }
+
+    switch (selectedPeriod) {
+        case 'today':
+            tasksForBulletin = tasksForBulletin.filter(task => task.deadlineDate && task.deadlineDate <= today);
+            break;
+        case 'current_week': {
+            const { start, end } = getWeekRange(today);
+            tasksForBulletin = tasksForBulletin.filter(task => task.deadlineDate && task.deadlineDate >= start && task.deadlineDate <= end);
+            break;
+        }
+        case 'next_week': {
+            const nextWeekDate = new Date(today);
+            nextWeekDate.setDate(today.getDate() + 7);
+            const { start, end } = getWeekRange(nextWeekDate);
+            tasksForBulletin = tasksForBulletin.filter(task => task.deadlineDate && task.deadlineDate >= start && task.deadlineDate <= end);
+            break;
+        }
+        case 'current_month': {
+            const start = new Date(today.getFullYear(), today.getMonth(), 1);
+            const end = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+            end.setHours(23, 59, 59, 999);
+            tasksForBulletin = tasksForBulletin.filter(task => task.deadlineDate && task.deadlineDate >= start && task.deadlineDate <= end);
+            break;
+        }
+        case 'custom': {
+            const start = parseDateInput(customStartDate);
+            const end = parseDateInput(customEndDate);
+            if (end) end.setHours(23, 59, 59, 999);
+
+            tasksForBulletin = tasksForBulletin.filter(task => {
+                if (!task.deadlineDate) return false;
+                const isAfterStart = start ? task.deadlineDate >= start : true;
+                const isBeforeEnd = end ? task.deadlineDate <= end : true;
+                return isAfterStart && isBeforeEnd;
+            });
+            break;
+        }
+        default:
+             tasksForBulletin = tasksForBulletin.filter(task => task.deadlineDate && task.deadlineDate <= today);
+             break;
+    }
+
+    const getPeriodDescription = () => {
+        switch (selectedPeriod) {
+            case 'today': return `Pendências até ${new Date().toLocaleDateString('pt-BR')}`;
+            case 'current_week': return 'Pendências da Semana Atual';
+            case 'next_week': return 'Pendências da Próxima Semana';
+            case 'current_month': return 'Pendências do Mês Atual';
+            case 'custom': {
+                if (customStartDate && customEndDate) return `Pendências de ${convertToDisplayDate(customStartDate)} a ${convertToDisplayDate(customEndDate)}`;
+                if (customStartDate) return `Pendências a partir de ${convertToDisplayDate(customStartDate)}`;
+                if (customEndDate) return `Pendências até ${convertToDisplayDate(customEndDate)}`;
+                return 'Pendências (Período Personalizado)';
+            }
+            default: return `Pendências até ${new Date().toLocaleDateString('pt-BR')}`;
+        }
+    }
+    const periodDescription = getPeriodDescription();
+
+    const html = generateDailyBulletinHtml(tasksForBulletin, adminSettings, selectedEmpreendimento, selectedAssunto, selectedResponsavel, periodDescription);
+    const teamsFriendlyHtml = generateTeamsHtml(tasksForBulletin, adminSettings, selectedEmpreendimento, selectedAssunto, selectedResponsavel, periodDescription);
+    const cardPayload = generateTeamsAdaptiveCard(tasksForBulletin, adminSettings, selectedEmpreendimento, selectedAssunto, selectedResponsavel, periodDescription);
     setEmailHtml(html);
     setTeamsHtml(teamsFriendlyHtml);
     setAdaptiveCard(cardPayload);
@@ -499,7 +634,7 @@ const DeadlinePanel: React.FC<DeadlinePanelProps> = ({ isOpen, onClose, onSelect
       subjectLineFilters.push(`Responsável: ${selectedResponsavel}`);
   }
   const subjectSuffix = subjectLineFilters.length > 0 ? ` - ${subjectLineFilters.join(' | ')}` : '';
-  const emailSubject = `Boletim Diário de Prazos - ${new Date().toLocaleDateString('pt-BR')}${subjectSuffix}`;
+  const emailSubject = `Boletim de Acompanhamento de Prazos - ${new Date().toLocaleDateString('pt-BR')}${subjectSuffix}`;
 
   return (
     <>
@@ -626,6 +761,12 @@ const DeadlinePanel: React.FC<DeadlinePanelProps> = ({ isOpen, onClose, onSelect
         setSelectedAssunto={setSelectedAssunto}
         selectedResponsavel={selectedResponsavel}
         setSelectedResponsavel={setSelectedResponsavel}
+        selectedPeriod={selectedPeriod}
+        setSelectedPeriod={setSelectedPeriod}
+        customStartDate={customStartDate}
+        setCustomStartDate={setCustomStartDate}
+        customEndDate={customEndDate}
+        setCustomEndDate={setCustomEndDate}
       />
       <BulletinPreviewModal 
         isOpen={showBulletinPreview} 

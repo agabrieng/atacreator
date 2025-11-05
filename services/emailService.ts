@@ -3,24 +3,20 @@ import type { Task, GroupedTasks, AdminSettings } from '../types';
 /**
  * Generates a professional HTML string for the daily deadline bulletin email.
  * This version uses robust inline styling and legacy attributes for maximum email client compatibility.
- * @param tasks - A list of all tasks. The function will filter for tasks due today.
+ * @param tasksForBulletin - A pre-filtered list of tasks to include in the bulletin.
  * @param adminSettings - The current company settings for branding.
  * @returns An HTML string.
  */
 export const generateDailyBulletinHtml = (
-  tasks: Task[], 
+  tasksForBulletin: Task[], 
   adminSettings: AdminSettings | null,
   empreendimentoFilter?: string,
   assuntoFilter?: string,
-  responsavelFilter?: string
+  responsavelFilter?: string,
+  periodDescription?: string
 ): string => {
   const today = new Date();
   const todayStr = today.toLocaleDateString('pt-BR', { year: 'numeric', month: 'long', day: 'numeric' });
-
-  // Include overdue and due-today tasks in the bulletin, as long as they are not completed.
-  const tasksForBulletin = tasks.filter(task => 
-    (task.status === 'due-today' || task.status === 'overdue') && !task.completed
-  );
 
   // Group the relevant tasks by responsible person
   const groupedTasksForBulletin = tasksForBulletin.reduce((acc: GroupedTasks, task) => {
@@ -41,21 +37,25 @@ export const generateDailyBulletinHtml = (
   // Helper for styled text.
   const createStyledSpan = (text: string, styles: string) => `<span style="${fontFamily} ${styles}">${text}</span>`;
 
-  const subtitleParts: string[] = [];
+  const mainFilterParts: string[] = [];
   if (empreendimentoFilter && empreendimentoFilter !== 'all') {
-      // Let strong tag inherit color from parent for better compatibility
-      subtitleParts.push(`<strong>Empreendimento:</strong> ${empreendimentoFilter}`);
-  }
-  if (assuntoFilter && assuntoFilter !== 'all') {
-      subtitleParts.push(`<strong>Assunto:</strong> ${assuntoFilter}`);
+    mainFilterParts.push(`<strong>Empreendimento:</strong> ${empreendimentoFilter}`);
   }
   if (responsavelFilter && responsavelFilter !== 'all') {
-      subtitleParts.push(`<strong>Responsável:</strong> ${responsavelFilter}`);
+    mainFilterParts.push(`<strong>Responsável:</strong> ${responsavelFilter}`);
+  }
+
+  const subtitleLines: string[] = [];
+  if (mainFilterParts.length > 0) {
+    subtitleLines.push(`Filtros: ${mainFilterParts.join(' | ')}`);
+  }
+  if (assuntoFilter && assuntoFilter !== 'all') {
+    subtitleLines.push(`<strong>Assunto:</strong> ${assuntoFilter}`);
   }
   
-  const subtitleText = subtitleParts.length > 0 
-      ? `Filtros: ${subtitleParts.join(' | ')}` 
-      : `Pendências até ${todayStr}`;
+  const subtitleText = subtitleLines.length > 0 
+    ? subtitleLines.join('<br>') 
+    : (periodDescription || `Pendências até ${todayStr}`);
 
   const hasTasks = Object.keys(groupedTasksForBulletin).length > 0;
   // Use a table with bgcolor for the yellow highlight to ensure Outlook compatibility.
@@ -74,28 +74,50 @@ export const generateDailyBulletinHtml = (
   // Enhance the task list to show status and deadline
   const renderTaskList = (tasks: Task[]) => {
     return tasks.map(task => {
-        const statusTextSimple = task.status === 'overdue' ? 'ATRASADO' : 'ENTREGA HOJE';
-        const statusText = statusTextSimple.replace(' ', '<br>');
-        const statusColor = task.status === 'overdue' ? '#c81e1e' : '#b45309';
-        const statusBgColor = task.status === 'overdue' ? '#fde8e8' : '#fff7ed';
+        let statusTextSimple = '';
+        let statusColor = '';
+        let statusBgColor = '';
 
-        // NEW: Prepend deadline to the description
+        switch (task.status) {
+            case 'overdue':
+                statusTextSimple = 'ATRASADO';
+                statusColor = '#c81e1e';
+                statusBgColor = '#fde8e8';
+                break;
+            case 'due-today':
+                statusTextSimple = 'ENTREGA HOJE';
+                statusColor = '#b45309';
+                statusBgColor = '#fff7ed';
+                break;
+            case 'upcoming':
+                statusTextSimple = 'TAREFA FUTURA';
+                statusColor = '#374151'; // gray-700
+                statusBgColor = '#f3f4f6'; // gray-100
+                break;
+            default:
+                // For 'no-deadline' or 'completed', we don't show a status badge
+                break;
+        }
+
         const deadlinePrefix = task.deadline ? createStyledSpan(`${task.deadline} - `, 'font-weight: bold; color: #343a40;') : '';
         const descriptionText = createStyledSpan(task.description.replace(/\n/g, '<br>'), 'color: #495057;');
         const descriptionHtml = `${deadlinePrefix}${descriptionText}`;
 
         const sourceHtml = `${createStyledSpan('Origem:', 'color: #6c757d; font-weight: bold;')} ${createStyledSpan(`${task.sourceAta.title} (${task.sourceAta.empreendimento}) - ${task.sourceAta.date}`, 'color: #6c757d;')}`;
         
-        // NEW: Simplified deadline content, only showing the status badge.
-        const deadlineContentHtml = `
-          <table align="right" border="0" cellpadding="0" cellspacing="0" style="margin: 0 0 0 auto;">
-            <tr>
-              <td align="center" valign="middle" bgcolor="${statusBgColor.replace('#', '')}" style="background-color: ${statusBgColor}; padding: 5px 10px; border-radius: 9px; text-align: center;">
-                <span style="${fontFamily} font-size: 10px; font-weight: bold; color: ${statusColor}; line-height: 1.2; text-transform: uppercase; white-space: nowrap;">${statusText}</span>
-              </td>
-            </tr>
-          </table>
-        `;
+        let deadlineContentHtml = '';
+        if (statusTextSimple) {
+            const statusText = statusTextSimple.replace(' ', '<br>');
+            deadlineContentHtml = `
+              <table align="right" border="0" cellpadding="0" cellspacing="0" style="margin: 0 0 0 auto;">
+                <tr>
+                  <td align="center" valign="middle" bgcolor="${statusBgColor.replace('#', '')}" style="background-color: ${statusBgColor}; padding: 5px 10px; border-radius: 9px; text-align: center;">
+                    <span style="${fontFamily} font-size: 10px; font-weight: bold; color: ${statusColor}; line-height: 1.2; text-transform: uppercase; white-space: nowrap;">${statusText}</span>
+                  </td>
+                </tr>
+              </table>
+            `;
+        }
 
         return `
             <tr style="border-bottom: 1px solid #dee2e6;">
@@ -162,7 +184,7 @@ export const generateDailyBulletinHtml = (
     <head>
       <meta charset="UTF-8">
       <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <title>Boletim Diário de Prazos</title>
+      <title>Boletim de Acompanhamento de Prazos</title>
     </head>
     <body style="margin: 0; padding: 0; background-color: #f8f9fa; ${fontFamily}">
       <table width="100%" cellspacing="0" cellpadding="0" border="0" style="background-color: #f8f9fa;">
@@ -173,7 +195,7 @@ export const generateDailyBulletinHtml = (
               <tr bgcolor="#e9ecef" style="background-color: #e9ecef;">
                 <td style="padding: 25px 30px; text-align: left; color: #495057;">
                   ${companyLogo ? `<img src="${companyLogo}" alt="Logo" style="max-height: 40px; margin-bottom: 10px;">` : ''}
-                  <h1 style="margin: 0; font-size: 24px; font-weight: bold; color: #212529; ${fontFamily}">Boletim Diário de Prazos</h1>
+                  <h1 style="margin: 0; font-size: 24px; font-weight: bold; color: #212529; ${fontFamily}">Boletim de Acompanhamento de Prazos</h1>
                   <p style="margin: 5px 0 0; font-size: 14px; line-height: 1.5; color: #495057; ${fontFamily}">${subtitleText}</p>
                   ${instructionalText}
                 </td>
@@ -200,25 +222,22 @@ export const generateDailyBulletinHtml = (
 /**
  * Generates a simplified, well-structured HTML string for direct pasting into Microsoft Teams.
  * This version uses divs as "cards" and proper list formatting to ensure a clean layout.
- * @param tasks - A list of all tasks.
+ * @param tasksForBulletin - A pre-filtered list of tasks.
  * @param adminSettings - The current company settings for branding.
  * @param empreendimentoFilter - Optional filter for empreendimento.
  * @param responsavelFilter - Optional filter for responsavel.
  * @returns An HTML string formatted for Teams.
  */
 export const generateTeamsHtml = (
-  tasks: Task[],
+  tasksForBulletin: Task[],
   adminSettings: AdminSettings | null,
   empreendimentoFilter?: string,
   assuntoFilter?: string,
-  responsavelFilter?: string
+  responsavelFilter?: string,
+  periodDescription?: string
 ): string => {
   const today = new Date();
   const todayStr = today.toLocaleDateString('pt-BR', { year: 'numeric', month: 'long', day: 'numeric' });
-
-  const tasksForBulletin = tasks.filter(task =>
-    (task.status === 'due-today' || task.status === 'overdue') && !task.completed
-  );
 
   const groupedTasks = tasksForBulletin.reduce((acc: GroupedTasks, task) => {
     const responsible = task.responsible || 'Não atribuído';
@@ -229,22 +248,27 @@ export const generateTeamsHtml = (
     return acc;
   }, {});
   
-  const subtitleParts: string[] = [];
+  const mainFilterParts: string[] = [];
   if (empreendimentoFilter && empreendimentoFilter !== 'all') {
-    subtitleParts.push(`<strong>Empreendimento:</strong> ${empreendimentoFilter}`);
-  }
-  if (assuntoFilter && assuntoFilter !== 'all') {
-    subtitleParts.push(`<strong>Assunto:</strong> ${assuntoFilter}`);
+    mainFilterParts.push(`<strong>Empreendimento:</strong> ${empreendimentoFilter}`);
   }
   if (responsavelFilter && responsavelFilter !== 'all') {
-    subtitleParts.push(`<strong>Responsável:</strong> ${responsavelFilter}`);
+    mainFilterParts.push(`<strong>Responsável:</strong> ${responsavelFilter}`);
   }
 
-  const subtitleText = subtitleParts.length > 0
-    ? `Filtros: ${subtitleParts.join(' | ')}`
-    : `Pendências até ${todayStr}`;
+  const subtitleLines: string[] = [];
+  if (mainFilterParts.length > 0) {
+    subtitleLines.push(`Filtros: ${mainFilterParts.join(' | ')}`);
+  }
+  if (assuntoFilter && assuntoFilter !== 'all') {
+    subtitleLines.push(`<strong>Assunto:</strong> ${assuntoFilter}`);
+  }
+
+  const subtitleHtml = subtitleLines.length > 0
+    ? `<p>${subtitleLines.join('</p><p>')}</p>`
+    : `<p>${periodDescription || `Pendências até ${todayStr}`}</p>`;
   
-  let html = `<div><p><strong>Boletim Diário de Prazos</strong></p><p>${subtitleText}</p></div>`;
+  let html = `<div><p><strong>Boletim de Acompanhamento de Prazos</strong></p>${subtitleHtml}</div>`;
 
   if (Object.keys(groupedTasks).length === 0) {
     html += '<hr><p>Nenhuma pendência encontrada com os filtros selecionados.</p>';
@@ -262,7 +286,14 @@ export const generateTeamsHtml = (
     html += `<p><strong>Responsável: ${responsible}</strong> (${taskCountText})</p>`;
     
     tasksForResponsible.forEach(task => {
-        const statusText = task.status === 'overdue' ? ' 🔴 (ATRASADO)' : ' 🟠 (ENTREGA HOJE)';
+        let statusText = '';
+        if (task.status === 'overdue') {
+            statusText = ' 🔴 (ATRASADO)';
+        } else if (task.status === 'due-today') {
+            statusText = ' 🟠 (ENTREGA HOJE)';
+        } else if (task.status === 'upcoming' && task.deadlineDate) {
+            statusText = ' 🔵 (TAREFA FUTURA)';
+        }
         
         const descriptionLines = task.description.split('\n').filter(line => line.trim() !== '');
         const taskTitle = descriptionLines.shift() || '';
@@ -295,25 +326,22 @@ export const generateTeamsHtml = (
 
 /**
  * Generates a Microsoft Teams Adaptive Card JSON payload for webhooks.
- * @param tasks - A list of all tasks.
+ * @param tasksForBulletin - A pre-filtered list of tasks.
  * @param adminSettings - The current company settings for branding.
  * @param empreendimentoFilter - Optional filter for empreendimento.
  * @param responsavelFilter - Optional filter for responsavel.
  * @returns An object representing the Adaptive Card payload.
  */
 export const generateTeamsAdaptiveCard = (
-  tasks: Task[],
+  tasksForBulletin: Task[],
   adminSettings: AdminSettings | null,
   empreendimentoFilter?: string,
   assuntoFilter?: string,
-  responsavelFilter?: string
+  responsavelFilter?: string,
+  periodDescription?: string
 ): object => {
   const today = new Date();
   const todayStr = today.toLocaleDateString('pt-BR', { year: 'numeric', month: 'long', day: 'numeric' });
-
-  const tasksForBulletin = tasks.filter(task =>
-    (task.status === 'due-today' || task.status === 'overdue') && !task.completed
-  );
 
   const groupedTasks = tasksForBulletin.reduce((acc: GroupedTasks, task) => {
     const responsible = task.responsible || 'Não atribuído';
@@ -322,36 +350,54 @@ export const generateTeamsAdaptiveCard = (
     return acc;
   }, {});
 
-  const subtitleParts: string[] = [];
-  if (empreendimentoFilter && empreendimentoFilter !== 'all') {
-    subtitleParts.push(`**Empreendimento:** ${empreendimentoFilter}`);
-  }
-  if (assuntoFilter && assuntoFilter !== 'all') {
-    subtitleParts.push(`**Assunto:** ${assuntoFilter}`);
-  }
-  if (responsavelFilter && responsavelFilter !== 'all') {
-    subtitleParts.push(`**Responsável:** ${responsavelFilter}`);
-  }
-  const subtitleText = subtitleParts.length > 0
-    ? `Filtros: ${subtitleParts.join(' | ')}`
-    : `Pendências até ${todayStr}`;
-  
   const cardBody: any[] = [
     {
       type: 'TextBlock',
-      text: 'Boletim Diário de Prazos',
+      text: 'Boletim de Acompanhamento de Prazos',
       size: 'large',
       weight: 'bolder',
       wrap: true,
     },
-    {
-      type: 'TextBlock',
-      text: subtitleText,
-      wrap: true,
-      isSubtle: true,
-    }
   ];
 
+  const mainFilterParts: string[] = [];
+  if (empreendimentoFilter && empreendimentoFilter !== 'all') {
+    mainFilterParts.push(`**Empreendimento:** ${empreendimentoFilter}`);
+  }
+  if (responsavelFilter && responsavelFilter !== 'all') {
+    mainFilterParts.push(`**Responsável:** ${responsavelFilter}`);
+  }
+
+  const hasMainFilters = mainFilterParts.length > 0;
+  if (hasMainFilters) {
+    cardBody.push({
+      type: 'TextBlock',
+      text: `Filtros: ${mainFilterParts.join(' | ')}`,
+      wrap: true,
+      isSubtle: true,
+    });
+  }
+
+  const hasAssuntoFilter = assuntoFilter && assuntoFilter !== 'all';
+  if (hasAssuntoFilter) {
+    cardBody.push({
+      type: 'TextBlock',
+      text: `**Assunto:** ${assuntoFilter}`,
+      wrap: true,
+      isSubtle: true,
+      spacing: hasMainFilters ? 'None' : 'Default',
+    });
+  }
+
+  if (!hasMainFilters && !hasAssuntoFilter) {
+    cardBody.push({
+      type: 'TextBlock',
+      text: periodDescription || `Pendências até ${todayStr}`,
+      isSubtle: true,
+      wrap: true,
+    });
+  }
+  
   if (Object.keys(groupedTasks).length === 0) {
     cardBody.push({
       type: 'TextBlock',
@@ -378,9 +424,14 @@ export const generateTeamsAdaptiveCard = (
       });
 
       tasksForResponsible.forEach(task => {
-        const statusText = task.status === 'overdue' 
-          ? `(ATRASADO) 🔴` 
-          : `(ENTREGA HOJE) 🟠`;
+        let statusFact = [];
+        if (task.status === 'overdue') {
+            statusFact.push({ title: 'Status:', value: `**(ATRASADO) 🔴**` });
+        } else if (task.status === 'due-today') {
+            statusFact.push({ title: 'Status:', value: `**(ENTREGA HOJE) 🟠**` });
+        } else if (task.status === 'upcoming' && task.deadlineDate) {
+            statusFact.push({ title: 'Status:', value: `**(TAREFA FUTURA) 🔵**` });
+        }
         
         const descriptionLines = task.description.split('\n').filter(line => line.trim() !== '');
         const taskTitle = descriptionLines.shift() || 'Tarefa sem descrição';
@@ -399,7 +450,7 @@ export const generateTeamsAdaptiveCard = (
               type: 'FactSet',
               facts: [
                 { title: 'Prazo:', value: `${task.deadline}` },
-                { title: 'Status:', value: `**${statusText}**` },
+                ...statusFact,
                 { title: 'Tarefa:', value: taskTitle },
                 ...(descriptionDetails ? [{ title: 'Detalhes:', value: descriptionDetails }] : []),
                 { title: 'Origem:', value: `${task.sourceAta.empreendimento} / ${task.sourceAta.title} (${task.sourceAta.date})` }
