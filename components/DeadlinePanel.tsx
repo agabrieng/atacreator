@@ -374,7 +374,7 @@ const DeadlinePanel: React.FC<DeadlinePanelProps> = ({ isOpen, onClose, onSelect
   const [selectedEmpreendimento, setSelectedEmpreendimento] = useState<string>('all');
   const [selectedAssunto, setSelectedAssunto] = useState<string>('all');
   const [selectedResponsavel, setSelectedResponsavel] = useState<string>('all');
-  const [selectedPeriod, setSelectedPeriod] = useState<string>('today');
+  const [selectedPeriod, setSelectedPeriod] = useState<string>('current_week');
   const [customStartDate, setCustomStartDate] = useState('');
   const [customEndDate, setCustomEndDate] = useState('');
 
@@ -399,61 +399,51 @@ const DeadlinePanel: React.FC<DeadlinePanelProps> = ({ isOpen, onClose, onSelect
     }
   }, [isOpen]);
 
-  const pendingTasks = useMemo(() => {
-    // Filtra por tarefas que estão 'atrasadas' ou com 'entrega hoje'.
-    return tasks.filter(task => (task.status === 'due-today' || task.status === 'overdue') && !task.completed);
+  const nonCompletedTasks = useMemo(() => {
+    return tasks.filter(task => !task.completed);
   }, [tasks]);
 
   const groupedTasks = useMemo(() => groupTasksByResponsible(tasks), [tasks]);
   
   const uniqueEmpreendimentos = useMemo(() => {
-      // A lista de empreendimentos para o filtro deve conter apenas aqueles com tarefas pendentes.
-      const empreendimentos = new Set(pendingTasks.map(task => task.sourceAta.empreendimento));
+      const empreendimentos = new Set(nonCompletedTasks.map(task => task.sourceAta.empreendimento));
       return Array.from(empreendimentos).sort();
-  }, [pendingTasks]);
+  }, [nonCompletedTasks]);
 
   const uniqueAssuntos = useMemo(() => {
-      let tasksToConsider = pendingTasks;
+      let tasksToConsider = nonCompletedTasks;
       if (selectedEmpreendimento !== 'all') {
           tasksToConsider = tasksToConsider.filter(task => task.sourceAta.empreendimento === selectedEmpreendimento);
       }
       const assuntos = new Set(tasksToConsider.map(task => task.sourceAta.assunto));
       return Array.from(assuntos).sort();
-  }, [pendingTasks, selectedEmpreendimento]);
+  }, [nonCompletedTasks, selectedEmpreendimento]);
   
   const filteredResponsaveis = useMemo(() => {
-    let tasksToConsider = pendingTasks;
-
-    // Se um empreendimento específico for selecionado, filtre as tarefas por ele.
+    let tasksToConsider = nonCompletedTasks;
     if (selectedEmpreendimento !== 'all') {
       tasksToConsider = tasksToConsider.filter(task => task.sourceAta.empreendimento === selectedEmpreendimento);
     }
-
     if (selectedAssunto !== 'all') {
         tasksToConsider = tasksToConsider.filter(task => task.sourceAta.assunto === selectedAssunto);
     }
-    
-    // A partir das tarefas consideradas, obtenha os nomes únicos dos responsáveis.
     const responsaveis = new Set(tasksToConsider.map(task => task.responsible));
     return Array.from(responsaveis).sort();
-  }, [pendingTasks, selectedEmpreendimento, selectedAssunto]);
+  }, [nonCompletedTasks, selectedEmpreendimento, selectedAssunto]);
 
   useEffect(() => {
-    // Se o empreendimento selecionado não for mais válido (ex: todas as suas tarefas pendentes foram concluídas), resete o filtro.
     if (selectedEmpreendimento !== 'all' && !uniqueEmpreendimentos.includes(selectedEmpreendimento)) {
         setSelectedEmpreendimento('all');
     }
   }, [uniqueEmpreendimentos, selectedEmpreendimento]);
 
   useEffect(() => {
-    // Se o assunto selecionado não for mais válido para o empreendimento atual, resete-o.
     if (selectedAssunto !== 'all' && !uniqueAssuntos.includes(selectedAssunto)) {
         setSelectedAssunto('all');
     }
   }, [uniqueAssuntos, selectedAssunto]);
 
   useEffect(() => {
-    // Se o responsável selecionado não estiver mais na lista para o empreendimento/assunto atual, resete-o.
     if (selectedResponsavel !== 'all' && !filteredResponsaveis.includes(selectedResponsavel)) {
         setSelectedResponsavel('all');
     }
@@ -475,8 +465,6 @@ const DeadlinePanel: React.FC<DeadlinePanelProps> = ({ isOpen, onClose, onSelect
 
             try {
                 await saveAtaToFirebase(ataToUpdate);
-                 // Optional: re-fetch to ensure data consistency after save
-                 // await fetchAndSetTasks();
             } catch (error) {
                 console.error("Failed to save task update:", error);
                 alert("Falha ao salvar a atualização da tarefa. A alteração foi desfeita.");
@@ -513,18 +501,17 @@ const DeadlinePanel: React.FC<DeadlinePanelProps> = ({ isOpen, onClose, onSelect
   };
   
   const handleGenerateBulletin = () => {
-    let filteredTasksByProps = tasks;
+    let tasksForBulletin = tasks.filter(task => !task.completed);
+
     if (selectedEmpreendimento !== 'all') {
-        filteredTasksByProps = filteredTasksByProps.filter(task => task.sourceAta.empreendimento === selectedEmpreendimento);
+        tasksForBulletin = tasksForBulletin.filter(task => task.sourceAta.empreendimento === selectedEmpreendimento);
     }
     if (selectedAssunto !== 'all') {
-        filteredTasksByProps = filteredTasksByProps.filter(task => task.sourceAta.assunto === selectedAssunto);
+        tasksForBulletin = tasksForBulletin.filter(task => task.sourceAta.assunto === selectedAssunto);
     }
     if (selectedResponsavel !== 'all') {
-        filteredTasksByProps = filteredTasksByProps.filter(task => task.responsible === selectedResponsavel);
+        tasksForBulletin = tasksForBulletin.filter(task => task.responsible === selectedResponsavel);
     }
-
-    let tasksForBulletin = filteredTasksByProps.filter(task => !task.completed);
 
     const today = new Date();
     today.setHours(0, 0, 0, 0);
