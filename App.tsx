@@ -266,9 +266,9 @@ const App: React.FC = () => {
         const newWebhook = { id: newId, name, url };
         setWebhooks(prev => [...prev, newWebhook].sort((a, b) => a.name.localeCompare(b.name)));
         setToast({ message: 'Webhook adicionado com sucesso!', type: 'success' });
-    } catch (error) {
+    } catch (error: any) {
         console.error("Failed to add webhook:", error);
-        setToast({ message: 'Falha ao adicionar webhook.', type: 'error' });
+        setToast({ message: `Falha ao adicionar webhook: ${error.message}`, type: 'error' });
     }
   };
   
@@ -277,9 +277,9 @@ const App: React.FC = () => {
         await updateWebhook(id, name, url);
         setWebhooks(prev => prev.map(w => w.id === id ? { ...w, name, url } : w).sort((a, b) => a.name.localeCompare(b.name)));
         setToast({ message: 'Webhook atualizado com sucesso!', type: 'success' });
-    } catch (error) {
+    } catch (error: any) {
         console.error("Failed to update webhook:", error);
-        setToast({ message: 'Falha ao atualizar webhook.', type: 'error' });
+        setToast({ message: `Falha ao atualizar webhook: ${error.message}`, type: 'error' });
     }
   };
 
@@ -288,9 +288,9 @@ const App: React.FC = () => {
         await deleteWebhook(id);
         setWebhooks(prev => prev.filter(w => w.id !== id));
         setToast({ message: 'Webhook excluído com sucesso!', type: 'success' });
-    } catch (error) {
+    } catch (error: any) {
         console.error("Failed to delete webhook:", error);
-        setToast({ message: 'Falha ao excluir webhook.', type: 'error' });
+        setToast({ message: `Falha ao excluir webhook: ${error.message}`, type: 'error' });
     }
   };
 
@@ -301,9 +301,10 @@ const App: React.FC = () => {
         const newId = await addEmpreendimento(name, contrato);
         const newProject = { id: newId, name, contrato };
         setEmpreendimentos(prev => [...prev, newProject].sort((a, b) => a.name.localeCompare(b.name)));
-    } catch (error) {
+        setToast({ message: 'Empreendimento adicionado!', type: 'success' });
+    } catch (error: any) {
         console.error("Failed to add project:", error);
-        alert("Falha ao adicionar empreendimento no Firebase.");
+        setToast({ message: `Falha ao adicionar empreendimento: ${error.message}`, type: 'error' });
     }
   };
 
@@ -311,9 +312,10 @@ const App: React.FC = () => {
     try {
         await updateEmpreendimento(id, newName, newContrato);
         setEmpreendimentos(prev => prev.map(p => p.id === id ? { ...p, name: newName, contrato: newContrato } : p).sort((a, b) => a.name.localeCompare(b.name)));
-    } catch (error) {
+        setToast({ message: 'Empreendimento atualizado!', type: 'success' });
+    } catch (error: any) {
         console.error("Failed to update project:", error);
-        alert("Falha ao atualizar empreendimento no Firebase.");
+        setToast({ message: `Falha ao atualizar empreendimento: ${error.message}`, type: 'error' });
     }
   };
   
@@ -329,9 +331,10 @@ const App: React.FC = () => {
         if (empreendimento === projectToDelete.name) {
             setEmpreendimento('');
         }
-    } catch (error) {
+        setToast({ message: 'Empreendimento excluído!', type: 'success' });
+    } catch (error: any) {
         console.error("Failed to delete project:", error);
-        alert("Falha ao excluir empreendimento do Firebase.");
+        setToast({ message: `Falha ao excluir empreendimento: ${error.message}`, type: 'error' });
     }
   };
 
@@ -423,6 +426,8 @@ const App: React.FC = () => {
             errorMessage = 'A chave de API não foi encontrada. Verifique se a variável de ambiente API_KEY está configurada no seu ambiente de produção.';
         } else if (err.message.includes('API key not valid')) {
             errorMessage = 'A chave de API do Gemini (configurada na variável de ambiente API_KEY) não é válida. Verifique se a chave está correta e se não foi confundida com a chave do Firebase. A chave para a API do Gemini é diferente e deve ser obtida no Google AI Studio.';
+        } else {
+            errorMessage = `Erro ao gerar ata: ${err.message}`;
         }
       }
       setError(errorMessage);
@@ -476,9 +481,9 @@ const App: React.FC = () => {
           setOriginalLoadedAta(savedAta);
       }
       setToast({ message: 'Ata salva com sucesso na nuvem!', type: 'success' });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Erro ao salvar a ata no Firebase:", error);
-      setToast({ message: 'Erro ao salvar a ata. Tente novamente.', type: 'error' });
+      setToast({ message: `Erro ao salvar a ata: ${error.message}`, type: 'error' });
     } finally {
       setIsSaving(false);
     }
@@ -546,9 +551,10 @@ const App: React.FC = () => {
       if (ata?.id === ataToDelete.id) {
         handleClear();
       }
-    } catch (error) {
+      setToast({ message: 'Ata excluída com sucesso!', type: 'success' });
+    } catch (error: any) {
       console.error("Failed to delete ata:", error);
-      alert("Ocorreu um erro ao excluir a ata do Firebase.");
+      setToast({ message: `Erro ao excluir a ata: ${error.message}`, type: 'error' });
     } finally {
       setShowDeleteConfirmation(false);
       setAtaToDelete(null);

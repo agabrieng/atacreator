@@ -15,7 +15,7 @@ import type { AtaData, Empreendimento, Webhook } from '../types';
 // As credenciais da conta de serviço não devem ser usadas no cliente.
 // O SDK da Web usa este objeto de configuração, que é seguro para expor.
 const firebaseConfig = {
-  apiKey: process.env.API_KEY,
+  apiKey: process.env.API_KEY, // UTILIZA A CHAVE DE API PRINCIPAL FORNECIDA PELO AMBIENTE.
   authDomain: "atacreator-79583.firebaseapp.com",
   projectId: "atacreator-79583",
   storageBucket: "atacreator-79583.appspot.com",
@@ -23,16 +23,21 @@ const firebaseConfig = {
   appId: "1:591942023537:web:8625d506a74a4ed8310e53"
 };
 
-console.warn(
-    "Atenção: A configuração do Firebase está usando a variável de ambiente API_KEY, que também é usada pela API do Gemini. " +
-    "A chave de API da Web do Firebase geralmente é diferente da chave secreta da API do Gemini. " +
-    "Verifique se o uso compartilhado está correto para a sua configuração."
-);
-
+// Adiciona uma verificação para garantir que a chave da API do Firebase esteja presente.
+if (!firebaseConfig.apiKey) {
+  throw new Error("A chave de API (API_KEY) não foi encontrada no ambiente. Verifique se a variável de ambiente está configurada, pois ela é necessária tanto para o Gemini quanto para o Firebase.");
+}
 
 // Inicializa o Firebase
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
+
+const handleFirebaseError = (error: any, context: string): Error => {
+  console.error(`Erro no Firebase ao ${context}: `, error);
+  // Retorna a mensagem de erro original para ser exibida na UI
+  return new Error(`Erro ao ${context}: ${error.message || 'Ocorreu um erro desconhecido.'}`);
+};
+
 
 const empreendimentosCollectionRef = collection(db, 'empreendimentos');
 const atasCollectionRef = collection(db, 'atas');
@@ -46,8 +51,7 @@ export const getEmpreendimentos = async (): Promise<Empreendimento[]> => {
     const querySnapshot = await getDocs(q);
     return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Empreendimento));
   } catch (error) {
-    console.error("Erro ao obter empreendimentos do Firebase: ", error);
-    throw new Error("Falha ao carregar empreendimentos do Firebase.");
+    throw handleFirebaseError(error, "obter empreendimentos");
   }
 };
 
@@ -56,8 +60,7 @@ export const addEmpreendimento = async (name: string, contrato: string): Promise
     const docRef = await addDoc(empreendimentosCollectionRef, { name, contrato });
     return docRef.id;
   } catch (error) {
-    console.error("Erro ao adicionar empreendimento ao Firebase: ", error);
-    throw new Error("Falha ao adicionar empreendimento no Firebase.");
+    throw handleFirebaseError(error, "adicionar empreendimento");
   }
 };
 
@@ -66,8 +69,7 @@ export const updateEmpreendimento = async (id: string, name: string, contrato: s
     const empreendimentoDoc = doc(db, 'empreendimentos', id);
     await updateDoc(empreendimentoDoc, { name, contrato });
   } catch (error) {
-    console.error("Erro ao atualizar empreendimento no Firebase: ", error);
-    throw new Error("Falha ao atualizar empreendimento no Firebase.");
+    throw handleFirebaseError(error, "atualizar empreendimento");
   }
 };
 
@@ -76,8 +78,7 @@ export const deleteEmpreendimento = async (id: string): Promise<void> => {
     const empreendimentoDoc = doc(db, 'empreendimentos', id);
     await deleteDoc(empreendimentoDoc);
   } catch (error) {
-    console.error("Erro ao excluir empreendimento do Firebase: ", error);
-    throw new Error("Falha ao excluir empreendimento do Firebase.");
+    throw handleFirebaseError(error, "excluir empreendimento");
   }
 };
 
@@ -98,8 +99,7 @@ export const saveAtaToFirebase = async (ataData: AtaData): Promise<string> => {
       return docRef.id;
     }
   } catch (error) {
-    console.error("Erro ao salvar ata no Firebase: ", error);
-    throw new Error("Falha ao salvar a ata no Firebase.");
+    throw handleFirebaseError(error, "salvar ata");
   }
 };
 
@@ -110,8 +110,7 @@ export const loadAtasFromFirebase = async (): Promise<AtaData[]> => {
         const querySnapshot = await getDocs(atasCollectionRef);
         return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as AtaData));
     } catch (error) {
-        console.error("Erro ao carregar atas do Firebase: ", error);
-        throw new Error("Falha ao carregar atas do Firebase. Verifique suas regras de segurança do Firestore.");
+        throw handleFirebaseError(error, "carregar atas");
     }
 };
 
@@ -121,8 +120,7 @@ export const deleteAtaFromFirebase = async (id: string): Promise<void> => {
         const ataDoc = doc(db, 'atas', id);
         await deleteDoc(ataDoc);
     } catch (error) {
-        console.error("Erro ao excluir ata do Firebase: ", error);
-        throw new Error("Falha ao excluir a ata do Firebase.");
+        throw handleFirebaseError(error, "excluir ata");
     }
 };
 
@@ -134,8 +132,7 @@ export const getWebhooks = async (): Promise<Webhook[]> => {
     const querySnapshot = await getDocs(q);
     return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Webhook));
   } catch (error) {
-    console.error("Erro ao obter webhooks do Firebase: ", error);
-    throw new Error("Falha ao carregar webhooks do Firebase.");
+    throw handleFirebaseError(error, "obter webhooks");
   }
 };
 
@@ -144,8 +141,7 @@ export const addWebhook = async (name: string, url: string): Promise<string> => 
     const docRef = await addDoc(webhooksCollectionRef, { name, url });
     return docRef.id;
   } catch (error) {
-    console.error("Erro ao adicionar webhook ao Firebase: ", error);
-    throw new Error("Falha ao adicionar webhook no Firebase.");
+    throw handleFirebaseError(error, "adicionar webhook");
   }
 };
 
@@ -154,8 +150,7 @@ export const updateWebhook = async (id: string, name: string, url: string): Prom
     const webhookDoc = doc(db, 'webhooks', id);
     await updateDoc(webhookDoc, { name, url });
   } catch (error) {
-    console.error("Erro ao atualizar webhook no Firebase: ", error);
-    throw new Error("Falha ao atualizar webhook no Firebase.");
+    throw handleFirebaseError(error, "atualizar webhook");
   }
 };
 
@@ -164,7 +159,6 @@ export const deleteWebhook = async (id: string): Promise<void> => {
     const webhookDoc = doc(db, 'webhooks', id);
     await deleteDoc(webhookDoc);
   } catch (error) {
-    console.error("Erro ao excluir webhook do Firebase: ", error);
-    throw new Error("Falha ao excluir webhook do Firebase.");
+    throw handleFirebaseError(error, "excluir webhook");
   }
 };

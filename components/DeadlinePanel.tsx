@@ -55,7 +55,7 @@ const convertToDisplayDate = (inputDate: string): string => {
     return inputDate;
 };
 
-// FIX: Define a type alias for the send status object to avoid type inference issues.
+// Define a type alias for the send status object to avoid type inference issues.
 type SendStatusInfo = {
     status: 'idle' | 'sending' | 'success' | 'error';
     message: string;
@@ -146,7 +146,7 @@ const BulletinPreviewModal: React.FC<{
         }
     };
 
-    // FIX: Add type annotation to `s` to resolve error when accessing `s.status`.
+    // Add type annotation to `s` to resolve error when accessing `s.status`.
     const isSending = Object.values(sendStatuses).some((s: SendStatusInfo) => s.status === 'sending');
 
     return (
@@ -184,9 +184,8 @@ const BulletinPreviewModal: React.FC<{
                             <h4 className="font-bold text-gray-800 dark:text-gray-200 mb-2">Enviar para Canais do Teams</h4>
                             <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">Selecione os canais para onde deseja enviar este boletim como um Cartão Adaptável.</p>
                             <div className="space-y-2 max-h-80 overflow-y-auto pr-2 -mr-2 border-t border-b py-4 dark:border-gray-700">
-                                {/* FIX: Refactor map to use a variable for the status object to help TypeScript with type inference. */}
                                 {webhooks.length > 0 ? webhooks.map(webhook => {
-                                    const statusInfo = sendStatuses[webhook.id];
+                                    const statusInfo: SendStatusInfo | undefined = sendStatuses[webhook.id];
                                     return (
                                         <label key={webhook.id} htmlFor={`webhook-${webhook.id}`} className="flex items-center p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700">
                                             <input id={`webhook-${webhook.id}`} type="checkbox" checked={!!selectedWebhooks[webhook.id]} onChange={e => setSelectedWebhooks(prev => ({...prev, [webhook.id]: e.target.checked}))} className="h-5 w-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
@@ -201,7 +200,6 @@ const BulletinPreviewModal: React.FC<{
                                     );
                                 }) : <p className="text-center text-sm text-gray-500 dark:text-gray-400 py-4">Nenhum webhook configurado. Adicione webhooks no painel de configurações.</p>}
                             </div>
-                            {/* FIX: Add type annotation to `status` to resolve error when accessing `status.status`. */}
                             {Object.values(sendStatuses).map((status: SendStatusInfo, i) => (
                                 status.status === 'error' ? <p key={i} className="text-xs text-red-600 mt-2">{status.message}</p> : null
                             ))}
