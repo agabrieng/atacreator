@@ -80,6 +80,7 @@ export interface Task {
   sourceAta: {
     id: string;
     title: string;
+    assunto: string;
     date: string;
     empreendimento: string;
   };

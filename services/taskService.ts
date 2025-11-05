@@ -73,6 +73,7 @@ export const getAllTasks = async (): Promise<Task[]> => {
               sourceAta: {
                 id: ata.id || '',
                 title: ata.titulo,
+                assunto: ata.assunto,
                 date: ata.data,
                 empreendimento: ata.empreendimento,
               },

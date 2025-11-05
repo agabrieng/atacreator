@@ -11,6 +11,7 @@ export const generateDailyBulletinHtml = (
   tasks: Task[], 
   adminSettings: AdminSettings | null,
   empreendimentoFilter?: string,
+  assuntoFilter?: string,
   responsavelFilter?: string
 ): string => {
   const today = new Date();
@@ -44,6 +45,9 @@ export const generateDailyBulletinHtml = (
   if (empreendimentoFilter && empreendimentoFilter !== 'all') {
       // Let strong tag inherit color from parent for better compatibility
       subtitleParts.push(`<strong>Empreendimento:</strong> ${empreendimentoFilter}`);
+  }
+  if (assuntoFilter && assuntoFilter !== 'all') {
+      subtitleParts.push(`<strong>Assunto:</strong> ${assuntoFilter}`);
   }
   if (responsavelFilter && responsavelFilter !== 'all') {
       subtitleParts.push(`<strong>Responsável:</strong> ${responsavelFilter}`);
@@ -206,6 +210,7 @@ export const generateTeamsHtml = (
   tasks: Task[],
   adminSettings: AdminSettings | null,
   empreendimentoFilter?: string,
+  assuntoFilter?: string,
   responsavelFilter?: string
 ): string => {
   const today = new Date();
@@ -227,6 +232,9 @@ export const generateTeamsHtml = (
   const subtitleParts: string[] = [];
   if (empreendimentoFilter && empreendimentoFilter !== 'all') {
     subtitleParts.push(`<strong>Empreendimento:</strong> ${empreendimentoFilter}`);
+  }
+  if (assuntoFilter && assuntoFilter !== 'all') {
+    subtitleParts.push(`<strong>Assunto:</strong> ${assuntoFilter}`);
   }
   if (responsavelFilter && responsavelFilter !== 'all') {
     subtitleParts.push(`<strong>Responsável:</strong> ${responsavelFilter}`);
@@ -297,6 +305,7 @@ export const generateTeamsAdaptiveCard = (
   tasks: Task[],
   adminSettings: AdminSettings | null,
   empreendimentoFilter?: string,
+  assuntoFilter?: string,
   responsavelFilter?: string
 ): object => {
   const today = new Date();
@@ -316,6 +325,9 @@ export const generateTeamsAdaptiveCard = (
   const subtitleParts: string[] = [];
   if (empreendimentoFilter && empreendimentoFilter !== 'all') {
     subtitleParts.push(`**Empreendimento:** ${empreendimentoFilter}`);
+  }
+  if (assuntoFilter && assuntoFilter !== 'all') {
+    subtitleParts.push(`**Assunto:** ${assuntoFilter}`);
   }
   if (responsavelFilter && responsavelFilter !== 'all') {
     subtitleParts.push(`**Responsável:** ${responsavelFilter}`);

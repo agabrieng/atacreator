@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import type { AtaData } from '../types';
-import { XIcon, FileTextIcon, AlertTriangleIcon, ChevronRightIcon, TrashIcon } from './icons';
+import { XIcon, FileTextIcon, AlertTriangleIcon, ChevronRightIcon, TrashIcon, SearchIcon } from './icons';
 
 interface SavedAtasPanelProps {
   isOpen: boolean;
@@ -28,12 +28,31 @@ const SavedAtasPanel: React.FC<SavedAtasPanelProps> = ({
   onDelete,
 }) => {
   const [expandedKeys, setExpandedKeys] = useState<Record<string, boolean>>({});
+  const [searchQuery, setSearchQuery] = useState('');
+
+  const filteredAtas = useMemo(() => {
+    if (!searchQuery.trim()) {
+        return atas;
+    }
+    const lowercasedQuery = searchQuery.toLowerCase();
+    return atas.filter(ata => {
+        const match = 
+            ata.titulo?.toLowerCase().includes(lowercasedQuery) ||
+            ata.assunto?.toLowerCase().includes(lowercasedQuery) ||
+            ata.empreendimento?.toLowerCase().includes(lowercasedQuery) ||
+            ata.data?.toLowerCase().includes(lowercasedQuery) ||
+            ata.participantes.some(p => p.nome.toLowerCase().includes(lowercasedQuery)) ||
+            ata.pauta.some(item => item.descricao.toLowerCase().includes(lowercasedQuery));
+        return match;
+    });
+  }, [atas, searchQuery]);
+
 
   // FIX: Explicitly type the accumulator and initial value for the `reduce` method
   // to resolve the "Untyped function calls may not accept type arguments" error.
   const groupedAtas = useMemo(() => {
-    if (!atas) return {};
-    return atas.reduce((acc: GroupedAtas, ata) => {
+    if (!filteredAtas) return {};
+    return filteredAtas.reduce((acc: GroupedAtas, ata) => {
       const empreendimento = ata.empreendimento || 'Sem Empreendimento';
       const assunto = ata.assunto || 'Sem Assunto';
       
@@ -46,7 +65,7 @@ const SavedAtasPanel: React.FC<SavedAtasPanelProps> = ({
       acc[empreendimento][assunto].push(ata);
       return acc;
     }, {} as GroupedAtas);
-  }, [atas]);
+  }, [filteredAtas]);
 
   if (!isOpen) return null;
 
@@ -81,6 +100,19 @@ const SavedAtasPanel: React.FC<SavedAtasPanelProps> = ({
             <XIcon className="w-6 h-6" />
           </button>
         </div>
+        
+        <div className="p-4 border-b border-gray-200 dark:border-gray-700">
+            <div className="relative">
+                <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 dark:text-gray-500" />
+                <input
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder="Buscar por título, assunto, data, participante..."
+                    className="w-full pl-10 pr-4 py-2 bg-gray-50 dark:bg-gray-700/60 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+            </div>
+        </div>
 
         <div className="flex-grow overflow-y-auto p-4">
           {isLoading && (
@@ -106,7 +138,15 @@ const SavedAtasPanel: React.FC<SavedAtasPanelProps> = ({
               </div>
           )}
 
-          {!isLoading && !error && atas.length > 0 && (
+          {!isLoading && !error && filteredAtas.length === 0 && searchQuery && (
+              <div className="flex flex-col items-center justify-center h-full text-center text-gray-500 dark:text-gray-400">
+                <SearchIcon className="w-16 h-16 mb-4 text-gray-300 dark:text-gray-600" />
+                <h3 className="text-lg font-semibold">Nenhum Resultado Encontrado</h3>
+                <p className="max-w-md mt-1 text-sm">Não foi encontrada nenhuma ata para a sua busca.</p>
+              </div>
+          )}
+
+          {!isLoading && !error && filteredAtas.length > 0 && (
              <div className="space-y-2">
                 {Object.entries(groupedAtas).map(([empreendimento, assuntos]) => (
                     <div key={empreendimento} className="border border-gray-200 dark:border-gray-700 rounded-lg">

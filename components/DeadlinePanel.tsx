@@ -223,12 +223,15 @@ const BulletinFilterModal: React.FC<{
     onClose: () => void;
     onGenerate: () => void;
     empreendimentos: string[];
+    assuntos: string[];
     responsaveis: string[];
     selectedEmpreendimento: string;
     setSelectedEmpreendimento: (value: string) => void;
+    selectedAssunto: string;
+    setSelectedAssunto: (value: string) => void;
     selectedResponsavel: string;
     setSelectedResponsavel: (value: string) => void;
-}> = ({ isOpen, onClose, onGenerate, empreendimentos, responsaveis, selectedEmpreendimento, setSelectedEmpreendimento, selectedResponsavel, setSelectedResponsavel }) => {
+}> = ({ isOpen, onClose, onGenerate, empreendimentos, assuntos, responsaveis, selectedEmpreendimento, setSelectedEmpreendimento, selectedAssunto, setSelectedAssunto, selectedResponsavel, setSelectedResponsavel }) => {
     if (!isOpen) return null;
 
     return (
@@ -257,6 +260,20 @@ const BulletinFilterModal: React.FC<{
                             >
                                 <option value="all">Todos os Empreendimentos</option>
                                 {empreendimentos.map(emp => <option key={emp} value={emp}>{emp}</option>)}
+                            </select>
+                        </div>
+                        <div>
+                            <label htmlFor="assunto-filter" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                                Filtrar por Assunto da Ata
+                            </label>
+                            <select
+                                id="assunto-filter"
+                                value={selectedAssunto}
+                                onChange={(e) => setSelectedAssunto(e.target.value)}
+                                className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md"
+                            >
+                                <option value="all">Todos os Assuntos</option>
+                                {assuntos.map(assunto => <option key={assunto} value={assunto}>{assunto}</option>)}
                             </select>
                         </div>
                          <div>
@@ -312,6 +329,7 @@ const DeadlinePanel: React.FC<DeadlinePanelProps> = ({ isOpen, onClose, onSelect
   const [showCompleted, setShowCompleted] = useState(true);
   const [isBulletinModalOpen, setIsBulletinModalOpen] = useState(false);
   const [selectedEmpreendimento, setSelectedEmpreendimento] = useState<string>('all');
+  const [selectedAssunto, setSelectedAssunto] = useState<string>('all');
   const [selectedResponsavel, setSelectedResponsavel] = useState<string>('all');
 
 
@@ -335,17 +353,65 @@ const DeadlinePanel: React.FC<DeadlinePanelProps> = ({ isOpen, onClose, onSelect
     }
   }, [isOpen]);
 
+  const pendingTasks = useMemo(() => {
+    // Filtra por tarefas que estão 'atrasadas' ou com 'entrega hoje'.
+    return tasks.filter(task => (task.status === 'due-today' || task.status === 'overdue') && !task.completed);
+  }, [tasks]);
+
   const groupedTasks = useMemo(() => groupTasksByResponsible(tasks), [tasks]);
   
   const uniqueEmpreendimentos = useMemo(() => {
-      const empreendimentos = new Set(tasks.map(task => task.sourceAta.empreendimento));
+      // A lista de empreendimentos para o filtro deve conter apenas aqueles com tarefas pendentes.
+      const empreendimentos = new Set(pendingTasks.map(task => task.sourceAta.empreendimento));
       return Array.from(empreendimentos).sort();
-  }, [tasks]);
+  }, [pendingTasks]);
+
+  const uniqueAssuntos = useMemo(() => {
+      let tasksToConsider = pendingTasks;
+      if (selectedEmpreendimento !== 'all') {
+          tasksToConsider = tasksToConsider.filter(task => task.sourceAta.empreendimento === selectedEmpreendimento);
+      }
+      const assuntos = new Set(tasksToConsider.map(task => task.sourceAta.assunto));
+      return Array.from(assuntos).sort();
+  }, [pendingTasks, selectedEmpreendimento]);
   
-  const uniqueResponsaveis = useMemo(() => {
-      const responsaveis = new Set(tasks.map(task => task.responsible));
-      return Array.from(responsaveis).sort();
-  }, [tasks]);
+  const filteredResponsaveis = useMemo(() => {
+    let tasksToConsider = pendingTasks;
+
+    // Se um empreendimento específico for selecionado, filtre as tarefas por ele.
+    if (selectedEmpreendimento !== 'all') {
+      tasksToConsider = tasksToConsider.filter(task => task.sourceAta.empreendimento === selectedEmpreendimento);
+    }
+
+    if (selectedAssunto !== 'all') {
+        tasksToConsider = tasksToConsider.filter(task => task.sourceAta.assunto === selectedAssunto);
+    }
+    
+    // A partir das tarefas consideradas, obtenha os nomes únicos dos responsáveis.
+    const responsaveis = new Set(tasksToConsider.map(task => task.responsible));
+    return Array.from(responsaveis).sort();
+  }, [pendingTasks, selectedEmpreendimento, selectedAssunto]);
+
+  useEffect(() => {
+    // Se o empreendimento selecionado não for mais válido (ex: todas as suas tarefas pendentes foram concluídas), resete o filtro.
+    if (selectedEmpreendimento !== 'all' && !uniqueEmpreendimentos.includes(selectedEmpreendimento)) {
+        setSelectedEmpreendimento('all');
+    }
+  }, [uniqueEmpreendimentos, selectedEmpreendimento]);
+
+  useEffect(() => {
+    // Se o assunto selecionado não for mais válido para o empreendimento atual, resete-o.
+    if (selectedAssunto !== 'all' && !uniqueAssuntos.includes(selectedAssunto)) {
+        setSelectedAssunto('all');
+    }
+  }, [uniqueAssuntos, selectedAssunto]);
+
+  useEffect(() => {
+    // Se o responsável selecionado não estiver mais na lista para o empreendimento/assunto atual, resete-o.
+    if (selectedResponsavel !== 'all' && !filteredResponsaveis.includes(selectedResponsavel)) {
+        setSelectedResponsavel('all');
+    }
+  }, [filteredResponsaveis, selectedResponsavel]);
 
   const handleUpdateTask = async (updatedTask: Task) => {
     // Optimistic UI update
@@ -405,13 +471,16 @@ const DeadlinePanel: React.FC<DeadlinePanelProps> = ({ isOpen, onClose, onSelect
     if (selectedEmpreendimento !== 'all') {
         filteredTasks = filteredTasks.filter(task => task.sourceAta.empreendimento === selectedEmpreendimento);
     }
+    if (selectedAssunto !== 'all') {
+        filteredTasks = filteredTasks.filter(task => task.sourceAta.assunto === selectedAssunto);
+    }
     if (selectedResponsavel !== 'all') {
         filteredTasks = filteredTasks.filter(task => task.responsible === selectedResponsavel);
     }
 
-    const html = generateDailyBulletinHtml(filteredTasks, adminSettings, selectedEmpreendimento, selectedResponsavel);
-    const teamsFriendlyHtml = generateTeamsHtml(filteredTasks, adminSettings, selectedEmpreendimento, selectedResponsavel);
-    const cardPayload = generateTeamsAdaptiveCard(filteredTasks, adminSettings, selectedEmpreendimento, selectedResponsavel);
+    const html = generateDailyBulletinHtml(filteredTasks, adminSettings, selectedEmpreendimento, selectedAssunto, selectedResponsavel);
+    const teamsFriendlyHtml = generateTeamsHtml(filteredTasks, adminSettings, selectedEmpreendimento, selectedAssunto, selectedResponsavel);
+    const cardPayload = generateTeamsAdaptiveCard(filteredTasks, adminSettings, selectedEmpreendimento, selectedAssunto, selectedResponsavel);
     setEmailHtml(html);
     setTeamsHtml(teamsFriendlyHtml);
     setAdaptiveCard(cardPayload);
@@ -422,6 +491,9 @@ const DeadlinePanel: React.FC<DeadlinePanelProps> = ({ isOpen, onClose, onSelect
   const subjectLineFilters: string[] = [];
   if (selectedEmpreendimento && selectedEmpreendimento !== 'all') {
       subjectLineFilters.push(`Empreendimento: ${selectedEmpreendimento}`);
+  }
+  if (selectedAssunto && selectedAssunto !== 'all') {
+    subjectLineFilters.push(`Assunto: ${selectedAssunto}`);
   }
   if (selectedResponsavel && selectedResponsavel !== 'all') {
       subjectLineFilters.push(`Responsável: ${selectedResponsavel}`);
@@ -546,9 +618,12 @@ const DeadlinePanel: React.FC<DeadlinePanelProps> = ({ isOpen, onClose, onSelect
         onClose={() => setIsBulletinModalOpen(false)}
         onGenerate={handleGenerateBulletin}
         empreendimentos={uniqueEmpreendimentos}
-        responsaveis={uniqueResponsaveis}
+        assuntos={uniqueAssuntos}
+        responsaveis={filteredResponsaveis}
         selectedEmpreendimento={selectedEmpreendimento}
         setSelectedEmpreendimento={setSelectedEmpreendimento}
+        selectedAssunto={selectedAssunto}
+        setSelectedAssunto={setSelectedAssunto}
         selectedResponsavel={selectedResponsavel}
         setSelectedResponsavel={setSelectedResponsavel}
       />
