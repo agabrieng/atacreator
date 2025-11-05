@@ -254,7 +254,7 @@ export const generateTeamsHtml = (
     html += `<p><strong>Responsável: ${responsible}</strong> (${taskCountText})</p>`;
     
     tasksForResponsible.forEach(task => {
-        const statusText = task.status === 'overdue' ? ' <font color="#A4262C"><strong>(ATRASADO)</strong></font>' : '';
+        const statusText = task.status === 'overdue' ? ' 🔴 (ATRASADO)' : ' 🟠 (ENTREGA HOJE)';
         
         const descriptionLines = task.description.split('\n').filter(line => line.trim() !== '');
         const taskTitle = descriptionLines.shift() || '';
@@ -351,8 +351,9 @@ export const generateTeamsAdaptiveCard = (
     Object.entries(groupedTasks).forEach(([responsible, tasksForResponsible], index) => {
       cardBody.push({
         type: 'Container',
-        style: 'emphasis',
+        separator: true,
         spacing: index === 0 ? 'large' : 'default',
+        style: 'warning', // Use 'warning' for yellow background
         items: [
           {
             type: 'TextBlock',
