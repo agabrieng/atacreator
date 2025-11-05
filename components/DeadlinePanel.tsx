@@ -83,12 +83,8 @@ const BulletinPreviewModal: React.FC<{
             setCopiedHtml(false);
             setCopiedTeams(false);
             setSendStatuses({});
-            // Pre-select all webhooks by default
-            const initialSelection = webhooks.reduce((acc, webhook) => {
-                acc[webhook.id] = true;
-                return acc;
-            }, {} as Record<string, boolean>);
-            setSelectedWebhooks(initialSelection);
+            // Deselect all webhooks by default to prevent accidental sends.
+            setSelectedWebhooks({});
         }
     }, [isOpen, webhooks]);
 
