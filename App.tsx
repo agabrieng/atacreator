@@ -1,7 +1,19 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import type { AtaData, AdminSettings, Participant, PautaItem, Empreendimento, Webhook } from './types';
 import { generateAtaData } from './services/geminiService';
-import { saveAtaToFirebase, loadAtasFromFirebase, deleteAtaFromFirebase, getEmpreendimentos, addEmpreendimento, updateEmpreendimento, deleteEmpreendimento } from './services/firebaseService';
+import { 
+    saveAtaToFirebase, 
+    loadAtasFromFirebase, 
+    deleteAtaFromFirebase, 
+    getEmpreendimentos, 
+    addEmpreendimento, 
+    updateEmpreendimento, 
+    deleteEmpreendimento,
+    getWebhooks,
+    addWebhook,
+    updateWebhook,
+    deleteWebhook
+} from './services/firebaseService';
 import { exportToPdf } from './services/exportService';
 import Header from './components/Header';
 import InputForm from './components/InputForm';
@@ -140,13 +152,13 @@ const App: React.FC = () => {
 
 
   useEffect(() => {
+    // Load company profiles from localStorage
     try {
       const savedProfilesStr = localStorage.getItem('ata-company-profiles');
       let profiles: Record<string, AdminSettings> = {};
       if (savedProfilesStr) {
         profiles = JSON.parse(savedProfilesStr);
       }
-      
       if (Object.keys(profiles).length === 0) {
         profiles[DEFAULT_COMPANY_NAME] = DEFAULT_SETTINGS;
       }
@@ -158,32 +170,39 @@ const App: React.FC = () => {
       } else {
         setCurrentCompanyName(Object.keys(profiles)[0]);
       }
-      
-      const savedWebhooksStr = localStorage.getItem('ata-webhooks');
-      if (savedWebhooksStr) {
-        setWebhooks(JSON.parse(savedWebhooksStr));
-      }
-
     } catch (e) {
-      console.error("Failed to load settings or webhooks from localStorage", e);
+      console.error("Failed to load settings from localStorage", e);
       setCompanyProfiles({ [DEFAULT_COMPANY_NAME]: DEFAULT_SETTINGS });
       setCurrentCompanyName(DEFAULT_COMPANY_NAME);
     }
     
+    // Load empreendimentos from Firebase
     const fetchEmpreendimentos = async () => {
         try {
             setIsProjectsLoading(true);
-            setError(null);
             const loadedEmpreendimentos = await getEmpreendimentos();
             setEmpreendimentos(loadedEmpreendimentos);
         } catch (error: any) {
             console.error("Failed to load empreendimentos from Firebase", error);
-            setError(`Falha ao carregar a lista de empreendimentos do Firebase: ${error.message}`);
+            setError(`Falha ao carregar a lista de empreendimentos: ${error.message}`);
         } finally {
             setIsProjectsLoading(false);
         }
     };
+    
+    // Load webhooks from Firebase
+    const fetchWebhooks = async () => {
+        try {
+            const loadedWebhooks = await getWebhooks();
+            setWebhooks(loadedWebhooks);
+        } catch (error: any) {
+            console.error("Failed to load webhooks from Firebase", error);
+            setToast({ message: `Falha ao carregar webhooks: ${error.message}`, type: 'error' });
+        }
+    };
+    
     fetchEmpreendimentos();
+    fetchWebhooks();
   }, []);
   
     useEffect(() => {
@@ -240,10 +259,39 @@ const App: React.FC = () => {
     localStorage.setItem('ata-current-company-name', currentCompany);
   }, []);
   
-  const handleWebhookSave = (newWebhooks: Webhook[]) => {
-    const sortedWebhooks = [...newWebhooks].sort((a, b) => a.name.localeCompare(b.name));
-    setWebhooks(sortedWebhooks);
-    localStorage.setItem('ata-webhooks', JSON.stringify(sortedWebhooks));
+  // --- Webhook Handlers ---
+  const handleAddWebhook = async (name: string, url: string) => {
+    try {
+        const newId = await addWebhook(name, url);
+        const newWebhook = { id: newId, name, url };
+        setWebhooks(prev => [...prev, newWebhook].sort((a, b) => a.name.localeCompare(b.name)));
+        setToast({ message: 'Webhook adicionado com sucesso!', type: 'success' });
+    } catch (error) {
+        console.error("Failed to add webhook:", error);
+        setToast({ message: 'Falha ao adicionar webhook.', type: 'error' });
+    }
+  };
+  
+  const handleUpdateWebhook = async (id: string, name: string, url: string) => {
+    try {
+        await updateWebhook(id, name, url);
+        setWebhooks(prev => prev.map(w => w.id === id ? { ...w, name, url } : w).sort((a, b) => a.name.localeCompare(b.name)));
+        setToast({ message: 'Webhook atualizado com sucesso!', type: 'success' });
+    } catch (error) {
+        console.error("Failed to update webhook:", error);
+        setToast({ message: 'Falha ao atualizar webhook.', type: 'error' });
+    }
+  };
+
+  const handleDeleteWebhook = async (id: string) => {
+    try {
+        await deleteWebhook(id);
+        setWebhooks(prev => prev.filter(w => w.id !== id));
+        setToast({ message: 'Webhook excluído com sucesso!', type: 'success' });
+    } catch (error) {
+        console.error("Failed to delete webhook:", error);
+        setToast({ message: 'Falha ao excluir webhook.', type: 'error' });
+    }
   };
 
 
@@ -675,7 +723,9 @@ const App: React.FC = () => {
         isOpen={isWebhookPanelOpen}
         onClose={() => setIsWebhookPanelOpen(false)}
         webhooks={webhooks}
-        onSave={handleWebhookSave}
+        onAdd={handleAddWebhook}
+        onUpdate={handleUpdateWebhook}
+        onDelete={handleDeleteWebhook}
       />
       <ConfirmationDialog
         isOpen={showClearConfirmation}

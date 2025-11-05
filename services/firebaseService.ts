@@ -10,7 +10,7 @@ import {
     query,
     orderBy 
 } from "firebase/firestore";
-import type { AtaData, Empreendimento } from '../types';
+import type { AtaData, Empreendimento, Webhook } from '../types';
 
 // As credenciais da conta de serviço não devem ser usadas no cliente.
 // O SDK da Web usa este objeto de configuração, que é seguro para expor.
@@ -36,6 +36,7 @@ const db = getFirestore(app);
 
 const empreendimentosCollectionRef = collection(db, 'empreendimentos');
 const atasCollectionRef = collection(db, 'atas');
+const webhooksCollectionRef = collection(db, 'webhooks');
 
 // --- Empreendimentos (Projetos) ---
 
@@ -123,4 +124,47 @@ export const deleteAtaFromFirebase = async (id: string): Promise<void> => {
         console.error("Erro ao excluir ata do Firebase: ", error);
         throw new Error("Falha ao excluir a ata do Firebase.");
     }
+};
+
+// --- Webhooks ---
+
+export const getWebhooks = async (): Promise<Webhook[]> => {
+  try {
+    const q = query(webhooksCollectionRef, orderBy('name'));
+    const querySnapshot = await getDocs(q);
+    return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Webhook));
+  } catch (error) {
+    console.error("Erro ao obter webhooks do Firebase: ", error);
+    throw new Error("Falha ao carregar webhooks do Firebase.");
+  }
+};
+
+export const addWebhook = async (name: string, url: string): Promise<string> => {
+  try {
+    const docRef = await addDoc(webhooksCollectionRef, { name, url });
+    return docRef.id;
+  } catch (error) {
+    console.error("Erro ao adicionar webhook ao Firebase: ", error);
+    throw new Error("Falha ao adicionar webhook no Firebase.");
+  }
+};
+
+export const updateWebhook = async (id: string, name: string, url: string): Promise<void> => {
+  try {
+    const webhookDoc = doc(db, 'webhooks', id);
+    await updateDoc(webhookDoc, { name, url });
+  } catch (error) {
+    console.error("Erro ao atualizar webhook no Firebase: ", error);
+    throw new Error("Falha ao atualizar webhook no Firebase.");
+  }
+};
+
+export const deleteWebhook = async (id: string): Promise<void> => {
+  try {
+    const webhookDoc = doc(db, 'webhooks', id);
+    await deleteDoc(webhookDoc);
+  } catch (error) {
+    console.error("Erro ao excluir webhook do Firebase: ", error);
+    throw new Error("Falha ao excluir webhook do Firebase.");
+  }
 };
