@@ -795,11 +795,36 @@ const AtaCreatorView: React.FC = () => {
 
 const App: React.FC = () => {
   const [currentView, setCurrentView] = useState<View>('dashboard');
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => {
+    try {
+      const savedState = localStorage.getItem('sidebarCollapsed');
+      return savedState ? JSON.parse(savedState) : false;
+    } catch {
+      return false;
+    }
+  });
+
+  const toggleSidebar = () => {
+    setIsSidebarCollapsed(prevState => {
+      const newState = !prevState;
+      try {
+        localStorage.setItem('sidebarCollapsed', JSON.stringify(newState));
+      } catch (error) {
+        console.error("Failed to save sidebar state to localStorage", error);
+      }
+      return newState;
+    });
+  };
 
   return (
     <div className="min-h-screen bg-slate-100 dark:bg-slate-900 text-slate-800 dark:text-slate-200 font-sans flex">
-      <Sidebar currentView={currentView} setCurrentView={setCurrentView} />
-      <div className="flex-1 w-full pl-64">
+      <Sidebar 
+        currentView={currentView} 
+        setCurrentView={setCurrentView}
+        isCollapsed={isSidebarCollapsed}
+        toggleCollapse={toggleSidebar}
+      />
+      <div className={`flex-1 w-full transition-all duration-300 ease-in-out ${isSidebarCollapsed ? 'pl-20' : 'pl-64'}`}>
         {currentView === 'dashboard' && <Dashboard />}
         {currentView === 'ataCreator' && <AtaCreatorView />}
       </div>

@@ -170,24 +170,50 @@ const TasksPerProjectChart: React.FC<{ tasks: Task[] }> = React.memo(({ tasks })
 });
 
 const UpcomingTasksList: React.FC<{ tasks: Task[] }> = React.memo(({ tasks }) => {
+    const dateIconStyles = {
+        overdue: {
+            bg: 'bg-red-100 dark:bg-red-900/50',
+            month: 'text-red-500 dark:text-red-400',
+            day: 'text-red-800 dark:text-red-200',
+        },
+        'due-today': {
+            bg: 'bg-yellow-100 dark:bg-yellow-900/50',
+            month: 'text-yellow-500 dark:text-yellow-400',
+            day: 'text-yellow-800 dark:text-yellow-200',
+        },
+        upcoming: {
+            bg: 'bg-green-100 dark:bg-green-900/50',
+            month: 'text-green-500 dark:text-green-400',
+            day: 'text-green-800 dark:text-green-200',
+        },
+        default: {
+            bg: 'bg-slate-100 dark:bg-slate-700',
+            month: 'text-slate-500 dark:text-slate-400',
+            day: 'text-slate-800 dark:text-slate-200',
+        }
+    };
+
     return (
         <div className="bg-white dark:bg-slate-800 p-6 rounded-xl shadow-lg border border-slate-200 dark:border-slate-700">
-             <h3 className="text-lg font-semibold text-slate-800 dark:text-slate-200 mb-4">Próximas Tarefas</h3>
+             <h3 className="text-lg font-semibold text-slate-800 dark:text-slate-200 mb-4">Acompanhamento de tarefas</h3>
              <div className="space-y-4">
-                {tasks.length > 0 ? tasks.map(task => (
-                    <div key={task.id} className="flex items-start space-x-3">
-                        <div className="flex-shrink-0 mt-1">
-                            <div className="w-10 h-10 flex flex-col items-center justify-center bg-slate-100 dark:bg-slate-700 rounded-lg">
-                                <span className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase">{task.deadlineDate?.toLocaleString('pt-BR', { month: 'short' })}</span>
-                                <span className="text-base font-bold text-slate-800 dark:text-slate-200">{task.deadlineDate?.getDate()}</span>
+                {tasks.length > 0 ? tasks.map(task => {
+                    const styles = dateIconStyles[task.status as keyof typeof dateIconStyles] || dateIconStyles.default;
+                    return (
+                        <div key={task.id} className="flex items-start space-x-3">
+                            <div className="flex-shrink-0 mt-1">
+                                <div className={`w-10 h-10 flex flex-col items-center justify-center rounded-lg ${styles.bg}`}>
+                                    <span className={`text-xs font-bold uppercase ${styles.month}`}>{task.deadlineDate?.toLocaleString('pt-BR', { month: 'short' }).replace('.', '')}</span>
+                                    <span className={`text-base font-bold ${styles.day}`}>{task.deadlineDate?.getDate()}</span>
+                                </div>
+                            </div>
+                            <div>
+                                <p className="text-sm font-medium text-slate-800 dark:text-slate-200 leading-tight">{task.description.split('\n')[0]}</p>
+                                <p className="text-xs text-slate-500 dark:text-slate-400">{task.responsible} &bull; {task.sourceAta.empreendimento}</p>
                             </div>
                         </div>
-                        <div>
-                            <p className="text-sm font-medium text-slate-800 dark:text-slate-200 leading-tight">{task.description.split('\n')[0]}</p>
-                            <p className="text-xs text-slate-500 dark:text-slate-400">{task.responsible} &bull; {task.sourceAta.empreendimento}</p>
-                        </div>
-                    </div>
-                )) : <p className="text-sm text-center text-slate-500 dark:text-slate-400 py-8">Nenhuma tarefa futura encontrada.</p>}
+                    );
+                }) : <p className="text-sm text-center text-slate-500 dark:text-slate-400 py-8">Nenhuma tarefa pendente para exibir.</p>}
              </div>
         </div>
     );
@@ -358,7 +384,7 @@ const Dashboard: React.FC = () => {
 
   const upcomingTasks = useMemo(() => {
     return tasks
-        .filter(task => !task.completed && task.status === 'upcoming' && task.deadlineDate)
+        .filter(task => !task.completed && ['upcoming', 'due-today', 'overdue'].includes(task.status) && task.deadlineDate)
         .sort((a, b) => a.deadlineDate!.getTime() - b.deadlineDate!.getTime())
         .slice(0, 7);
   }, [tasks]);
@@ -399,13 +425,15 @@ const Dashboard: React.FC = () => {
         
         {/* Charts Layout */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
-            <div className="lg:col-span-2">
+            {/* Coluna Principal (2/3) */}
+            <div className="lg:col-span-2 flex flex-col gap-6">
                 <TaskEvolutionChart tasks={tasks} />
-            </div>
-            <UpcomingTasksList tasks={upcomingTasks} />
-            <TaskStatusPieChart tasks={tasks} />
-            <div className="lg:col-span-2">
                 <TasksPerProjectChart tasks={tasks} />
+            </div>
+            {/* Coluna Lateral (1/3) */}
+            <div className="lg:col-span-1 flex flex-col gap-6">
+                <TaskStatusPieChart tasks={tasks} />
+                <UpcomingTasksList tasks={upcomingTasks} />
             </div>
         </div>
     </div>
