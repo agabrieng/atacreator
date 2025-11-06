@@ -17,8 +17,8 @@ interface DeadlinePanelProps {
 const statusStyles = {
     overdue: 'bg-red-100 dark:bg-red-900/50 text-red-700 dark:text-red-300',
     'due-today': 'bg-orange-100 dark:bg-orange-900/50 text-orange-700 dark:text-orange-300',
-    upcoming: 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300',
-    'no-deadline': 'bg-transparent text-gray-500 dark:text-gray-400',
+    upcoming: 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300',
+    'no-deadline': 'bg-transparent text-slate-500 dark:text-slate-400',
     completed: 'bg-green-100 dark:bg-green-900/50 text-green-700 dark:text-green-300',
 };
 const statusText = {
@@ -147,27 +147,27 @@ const BulletinPreviewModal: React.FC<{
 
     return (
         <div className="fixed inset-0 bg-black bg-opacity-70 z-50 flex items-center justify-center p-4" onClick={onClose}>
-            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl w-full max-w-4xl flex flex-col h-[90vh]" onClick={(e) => e.stopPropagation()}>
-                <div className="flex justify-between items-center p-4 border-b border-gray-200 dark:border-gray-700">
-                    <h3 className="text-lg font-bold text-gray-800 dark:text-gray-100">Pré-visualização e Envio do Boletim</h3>
-                     <button onClick={onClose} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"><XIcon className="w-6 h-6" /></button>
+            <div className="bg-white dark:bg-slate-800 rounded-xl shadow-2xl w-full max-w-4xl flex flex-col h-[90vh]" onClick={(e) => e.stopPropagation()}>
+                <div className="flex justify-between items-center p-4 border-b border-slate-200 dark:border-slate-700">
+                    <h3 className="text-lg font-bold text-slate-800 dark:text-slate-100">Pré-visualização e Envio do Boletim</h3>
+                     <button onClick={onClose} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"><XIcon className="w-6 h-6" /></button>
                 </div>
                 
-                 <div className="flex border-b border-gray-200 dark:border-gray-700">
-                    <button onClick={() => setActiveTab('email')} className={`px-4 py-3 text-sm font-semibold ${activeTab === 'email' ? 'border-b-2 border-blue-600 text-blue-600' : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'}`}>Email</button>
-                    <button onClick={() => setActiveTab('teams')} className={`px-4 py-3 text-sm font-semibold ${activeTab === 'teams' ? 'border-b-2 border-blue-600 text-blue-600' : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'}`}>Microsoft Teams</button>
+                 <div className="flex border-b border-slate-200 dark:border-slate-700">
+                    <button onClick={() => setActiveTab('email')} className={`px-4 py-3 text-sm font-semibold ${activeTab === 'email' ? 'border-b-2 border-blue-600 text-blue-600' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}>Email</button>
+                    <button onClick={() => setActiveTab('teams')} className={`px-4 py-3 text-sm font-semibold ${activeTab === 'teams' ? 'border-b-2 border-blue-600 text-blue-600' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}>Microsoft Teams</button>
                 </div>
 
                 {activeTab === 'email' && (
                     <>
-                        <div className="p-4 bg-gray-200 dark:bg-gray-900 text-sm font-mono rounded-t-md">
-                            <p><span className="font-semibold text-gray-600 dark:text-gray-400">Assunto:</span> {subject}</p>
+                        <div className="p-4 bg-slate-200 dark:bg-slate-900 text-sm font-mono rounded-t-md">
+                            <p><span className="font-semibold text-slate-600 dark:text-slate-400">Assunto:</span> {subject}</p>
                         </div>
                         <iframe srcDoc={htmlContent} title="Email Preview" className="w-full flex-grow border-0" />
-                        <div className="bg-gray-50 dark:bg-gray-800/50 px-6 py-4 flex justify-between items-center border-t border-gray-200 dark:border-gray-700 rounded-b-xl">
-                            <p className="text-xs text-gray-500 dark:text-gray-400 max-w-xs">Use "Copiar para Email" para colar em clientes como Outlook, e "Copiar para Teams" para colar em chats.</p>
+                        <div className="bg-slate-50 dark:bg-slate-800/50 px-6 py-4 flex justify-between items-center border-t border-slate-200 dark:border-slate-700 rounded-b-xl">
+                            <p className="text-xs text-slate-500 dark:text-slate-400 max-w-xs">Use "Copiar para Email" para colar em clientes como Outlook, e "Copiar para Teams" para colar em chats.</p>
                              <div className="flex flex-row-reverse gap-3">
-                                <button onClick={onClose} className="inline-flex justify-center rounded-md border border-gray-300 dark:border-gray-600 shadow-sm px-4 py-2 bg-white dark:bg-gray-700 text-base font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-600">Fechar</button>
+                                <button onClick={onClose} className="inline-flex justify-center rounded-md border border-slate-300 dark:border-slate-600 shadow-sm px-4 py-2 bg-white dark:bg-slate-700 text-base font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-600">Fechar</button>
                                 <button onClick={handleCopyTeamsToClipboard} className={`inline-flex items-center justify-center rounded-md border shadow-sm px-4 py-2 text-base font-medium ${copiedTeams ? 'bg-green-600 text-white' : 'bg-purple-600 text-white hover:bg-purple-700'}`}><UsersIcon className="w-5 h-5 mr-2" />{copiedTeams ? 'Copiado!' : 'Copiar para Teams'}</button>
                                 <button onClick={handleCopyHtmlToClipboard} className={`inline-flex items-center justify-center rounded-md border shadow-sm px-4 py-2 text-base font-medium ${copiedHtml ? 'bg-green-600 text-white' : 'bg-blue-600 text-white hover:bg-blue-700'}`}><CopyIcon className="w-5 h-5 mr-2" />{copiedHtml ? 'Copiado!' : 'Copiar para Email'}</button>
                             </div>
@@ -177,15 +177,15 @@ const BulletinPreviewModal: React.FC<{
                 {activeTab === 'teams' && (
                      <>
                         <div className="flex-grow p-6 overflow-y-auto">
-                            <h4 className="font-bold text-gray-800 dark:text-gray-200 mb-2">Enviar para Canais do Teams</h4>
-                            <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">Selecione os canais para onde deseja enviar este boletim como um Cartão Adaptável.</p>
-                            <div className="space-y-2 max-h-80 overflow-y-auto pr-2 -mr-2 border-t border-b py-4 dark:border-gray-700">
+                            <h4 className="font-bold text-slate-800 dark:text-slate-200 mb-2">Enviar para Canais do Teams</h4>
+                            <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">Selecione os canais para onde deseja enviar este boletim como um Cartão Adaptável.</p>
+                            <div className="space-y-2 max-h-80 overflow-y-auto pr-2 -mr-2 border-t border-b py-4 dark:border-slate-700">
                                 {webhooks.length > 0 ? webhooks.map(webhook => {
                                     const statusInfo: SendStatusInfo | undefined = sendStatuses[webhook.id];
                                     return (
-                                        <label key={webhook.id} htmlFor={`webhook-${webhook.id}`} className="flex items-center p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700">
-                                            <input id={`webhook-${webhook.id}`} type="checkbox" checked={!!selectedWebhooks[webhook.id]} onChange={e => setSelectedWebhooks(prev => ({...prev, [webhook.id]: e.target.checked}))} className="h-5 w-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
-                                            <span className="ml-3 text-sm font-medium text-gray-800 dark:text-gray-200">{webhook.name}</span>
+                                        <label key={webhook.id} htmlFor={`webhook-${webhook.id}`} className="flex items-center p-3 bg-slate-50 dark:bg-slate-700/50 rounded-lg cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-700">
+                                            <input id={`webhook-${webhook.id}`} type="checkbox" checked={!!selectedWebhooks[webhook.id]} onChange={e => setSelectedWebhooks(prev => ({...prev, [webhook.id]: e.target.checked}))} className="h-5 w-5 rounded border-slate-300 text-blue-600 focus:ring-blue-500" />
+                                            <span className="ml-3 text-sm font-medium text-slate-800 dark:text-slate-200">{webhook.name}</span>
                                             {statusInfo && (
                                                  <span className={`ml-auto text-xs font-bold px-2 py-0.5 rounded-full ${
                                                      statusInfo.status === 'sending' ? 'bg-blue-100 text-blue-800' :
@@ -194,14 +194,14 @@ const BulletinPreviewModal: React.FC<{
                                             )}
                                         </label>
                                     );
-                                }) : <p className="text-center text-sm text-gray-500 dark:text-gray-400 py-4">Nenhum webhook configurado. Adicione webhooks no painel de configurações.</p>}
+                                }) : <p className="text-center text-sm text-slate-500 dark:text-slate-400 py-4">Nenhum webhook configurado. Adicione webhooks no painel de configurações.</p>}
                             </div>
                             {Object.values(sendStatuses).map((status: SendStatusInfo, i) => (
                                 status.status === 'error' ? <p key={i} className="text-xs text-red-600 mt-2">{status.message}</p> : null
                             ))}
                         </div>
-                         <div className="bg-gray-50 dark:bg-gray-800/50 px-6 py-4 flex justify-end items-center gap-3 border-t border-gray-200 dark:border-gray-700 rounded-b-xl">
-                            <button onClick={onClose} className="inline-flex justify-center rounded-md border border-gray-300 dark:border-gray-600 shadow-sm px-4 py-2 bg-white dark:bg-gray-700 text-base font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-600">Fechar</button>
+                         <div className="bg-slate-50 dark:bg-slate-800/50 px-6 py-4 flex justify-end items-center gap-3 border-t border-slate-200 dark:border-slate-700 rounded-b-xl">
+                            <button onClick={onClose} className="inline-flex justify-center rounded-md border border-slate-300 dark:border-slate-600 shadow-sm px-4 py-2 bg-white dark:bg-slate-700 text-base font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-600">Fechar</button>
                             <button onClick={handleSendToTeams} disabled={isSending || webhooks.length === 0} className="inline-flex items-center justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-blue-600 text-base font-medium text-white hover:bg-blue-700 disabled:bg-blue-400 disabled:cursor-not-allowed">
                                 {isSending ? <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div> : <SendIcon className="w-5 h-5 mr-2" />}
                                 {isSending ? 'Enviando...' : `Enviar para (${Object.values(selectedWebhooks).filter(Boolean).length}) Canal(is)`}
@@ -238,27 +238,27 @@ const BulletinFilterModal: React.FC<{
 
     return (
         <div className="fixed inset-0 bg-black bg-opacity-60 z-50 flex items-center justify-center p-4" onClick={onClose}>
-            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl w-full max-w-md" onClick={(e) => e.stopPropagation()}>
+            <div className="bg-white dark:bg-slate-800 rounded-xl shadow-2xl w-full max-w-md" onClick={(e) => e.stopPropagation()}>
                 <div className="p-6">
                     <div className="flex justify-between items-start">
-                        <h3 className="text-lg leading-6 font-bold text-gray-900 dark:text-gray-100 flex items-center">
+                        <h3 className="text-lg leading-6 font-bold text-slate-900 dark:text-slate-100 flex items-center">
                            <SparklesIcon className="w-5 h-5 mr-2 text-blue-500"/>
                             Gerar Boletim Direcionado
                         </h3>
-                         <button onClick={onClose} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200">
+                         <button onClick={onClose} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">
                             <XIcon className="w-6 h-6" />
                         </button>
                     </div>
                     <div className="mt-4 space-y-4">
                         <div>
-                            <label htmlFor="period-filter" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                            <label htmlFor="period-filter" className="block text-sm font-medium text-slate-700 dark:text-slate-300">
                                 Filtrar por Período do Prazo
                             </label>
                             <select
                                 id="period-filter"
                                 value={selectedPeriod}
                                 onChange={(e) => setSelectedPeriod(e.target.value)}
-                                className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md"
+                                className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md"
                             >
                                 <option value="today">Até a data de hoje</option>
                                 <option value="current_week">Semana atual</option>
@@ -270,75 +270,75 @@ const BulletinFilterModal: React.FC<{
                         {selectedPeriod === 'custom' && (
                             <div className="flex items-center gap-2">
                                 <div className="flex-1">
-                                    <label htmlFor="start-date" className="block text-xs font-medium text-gray-500 dark:text-gray-400">De</label>
+                                    <label htmlFor="start-date" className="block text-xs font-medium text-slate-500 dark:text-slate-400">De</label>
                                     <input
                                         type="date"
                                         id="start-date"
                                         value={customStartDate}
                                         onChange={(e) => setCustomStartDate(e.target.value)}
-                                        className="mt-1 block w-full pl-3 pr-1 py-2 text-base border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md"
+                                        className="mt-1 block w-full pl-3 pr-1 py-2 text-base border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md"
                                     />
                                 </div>
                                 <div className="flex-1">
-                                    <label htmlFor="end-date" className="block text-xs font-medium text-gray-500 dark:text-gray-400">Até</label>
+                                    <label htmlFor="end-date" className="block text-xs font-medium text-slate-500 dark:text-slate-400">Até</label>
                                     <input
                                         type="date"
                                         id="end-date"
                                         value={customEndDate}
                                         onChange={(e) => setCustomEndDate(e.target.value)}
-                                        className="mt-1 block w-full pl-3 pr-1 py-2 text-base border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md"
+                                        className="mt-1 block w-full pl-3 pr-1 py-2 text-base border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md"
                                     />
                                 </div>
                             </div>
                         )}
                         <div>
-                            <label htmlFor="empreendimento-filter" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                            <label htmlFor="empreendimento-filter" className="block text-sm font-medium text-slate-700 dark:text-slate-300">
                                 Filtrar por Empreendimento
                             </label>
                             <select
                                 id="empreendimento-filter"
                                 value={selectedEmpreendimento}
                                 onChange={(e) => setSelectedEmpreendimento(e.target.value)}
-                                className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md"
+                                className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md"
                             >
                                 <option value="all">Todos os Empreendimentos</option>
                                 {empreendimentos.map(emp => <option key={emp} value={emp}>{emp}</option>)}
                             </select>
                         </div>
                         <div>
-                            <label htmlFor="assunto-filter" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                            <label htmlFor="assunto-filter" className="block text-sm font-medium text-slate-700 dark:text-slate-300">
                                 Filtrar por Assunto da Ata
                             </label>
                             <select
                                 id="assunto-filter"
                                 value={selectedAssunto}
                                 onChange={(e) => setSelectedAssunto(e.target.value)}
-                                className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md"
+                                className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md"
                             >
                                 <option value="all">Todos os Assuntos</option>
                                 {assuntos.map(assunto => <option key={assunto} value={assunto}>{assunto}</option>)}
                             </select>
                         </div>
                          <div>
-                            <label htmlFor="responsavel-filter" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                            <label htmlFor="responsavel-filter" className="block text-sm font-medium text-slate-700 dark:text-slate-300">
                                 Filtrar por Responsável
                             </label>
                             <select
                                 id="responsavel-filter"
                                 value={selectedResponsavel}
                                 onChange={(e) => setSelectedResponsavel(e.target.value)}
-                                className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md"
+                                className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md"
                             >
                                 <option value="all">Todos os Responsáveis</option>
                                 {responsaveis.map(resp => <option key={resp} value={resp}>{resp}</option>)}
                             </select>
                         </div>
-                        <p className="text-xs text-gray-500 dark:text-gray-400 pt-2">
+                        <p className="text-xs text-slate-500 dark:text-slate-400 pt-2">
                            O boletim incluirá tarefas não concluídas que correspondam aos filtros de período, empreendimento, assunto e responsável selecionados.
                         </p>
                     </div>
                 </div>
-                <div className="bg-gray-50 dark:bg-gray-800/50 px-6 py-4 flex flex-row-reverse gap-3 rounded-b-xl">
+                <div className="bg-slate-50 dark:bg-slate-800/50 px-6 py-4 flex flex-row-reverse gap-3 rounded-b-xl">
                     <button
                         type="button"
                         className="inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-blue-600 text-base font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
@@ -348,7 +348,7 @@ const BulletinFilterModal: React.FC<{
                     </button>
                     <button
                         type="button"
-                        className="inline-flex justify-center rounded-md border border-gray-300 dark:border-gray-600 shadow-sm px-4 py-2 bg-white dark:bg-gray-700 text-base font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                        className="inline-flex justify-center rounded-md border border-slate-300 dark:border-slate-600 shadow-sm px-4 py-2 bg-white dark:bg-slate-700 text-base font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
                         onClick={onClose}
                     >
                         Cancelar
@@ -622,19 +622,19 @@ const DeadlinePanel: React.FC<DeadlinePanelProps> = ({ isOpen, onClose, onSelect
   return (
     <>
       <div className="fixed inset-0 bg-black bg-opacity-60 z-40 flex items-center justify-center p-4" onClick={onClose}>
-        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl w-full max-w-4xl flex flex-col h-[90vh]" onClick={(e) => e.stopPropagation()}>
-          <div className="flex justify-between items-center p-4 border-b border-gray-200 dark:border-gray-700">
-            <h2 className="text-xl font-bold text-gray-800 dark:text-gray-100 flex items-center"><CalendarCheckIcon className="w-6 h-6 mr-3 text-blue-600 dark:text-blue-400"/>Painel de Prazos</h2>
+        <div className="bg-white dark:bg-slate-800 rounded-xl shadow-2xl w-full max-w-4xl flex flex-col h-[90vh]" onClick={(e) => e.stopPropagation()}>
+          <div className="flex justify-between items-center p-4 border-b border-slate-200 dark:border-slate-700">
+            <h2 className="text-xl font-bold text-slate-800 dark:text-slate-100 flex items-center"><CalendarCheckIcon className="w-6 h-6 mr-3 text-blue-600 dark:text-blue-400"/>Painel de Prazos</h2>
             <div className="flex items-center gap-4">
                  <label htmlFor="show-completed-toggle" className="flex items-center cursor-pointer">
-                    <span className="mr-3 text-sm font-medium text-gray-700 dark:text-gray-300">Ocultar Concluídas</span>
+                    <span className="mr-3 text-sm font-medium text-slate-700 dark:text-slate-300">Ocultar Concluídas</span>
                     <div className="relative">
                         <input type="checkbox" id="show-completed-toggle" className="sr-only" checked={!showCompleted} onChange={() => setShowCompleted(!showCompleted)} />
-                        <div className="block bg-gray-200 dark:bg-gray-600 w-10 h-6 rounded-full"></div>
+                        <div className="block bg-slate-200 dark:bg-slate-600 w-10 h-6 rounded-full"></div>
                         <div className={`dot absolute left-1 top-1 bg-white w-4 h-4 rounded-full transition-transform ${!showCompleted ? 'transform translate-x-full bg-blue-500' : ''}`}></div>
                     </div>
                 </label>
-                <button onClick={onClose} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"><XIcon className="w-6 h-6" /></button>
+                <button onClick={onClose} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"><XIcon className="w-6 h-6" /></button>
             </div>
           </div>
 
@@ -642,7 +642,7 @@ const DeadlinePanel: React.FC<DeadlinePanelProps> = ({ isOpen, onClose, onSelect
             {isLoading && (
               <div className="flex flex-col items-center justify-center h-full">
                 <div className="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
-                <p className="mt-4 text-gray-600 dark:text-gray-300">Analisando todos os prazos...</p>
+                <p className="mt-4 text-slate-600 dark:text-slate-300">Analisando todos os prazos...</p>
               </div>
             )}
             {error && (
@@ -653,8 +653,8 @@ const DeadlinePanel: React.FC<DeadlinePanelProps> = ({ isOpen, onClose, onSelect
               </div>
             )}
             {!isLoading && !error && tasks.length === 0 && (
-              <div className="flex flex-col items-center justify-center h-full text-center text-gray-500 dark:text-gray-400">
-                <CalendarCheckIcon className="w-16 h-16 mb-4 text-gray-300 dark:text-gray-600" />
+              <div className="flex flex-col items-center justify-center h-full text-center text-slate-500 dark:text-slate-400">
+                <CalendarCheckIcon className="w-16 h-16 mb-4 text-slate-300 dark:text-slate-600" />
                 <h3 className="text-lg font-semibold">Nenhuma Tarefa Encontrada</h3>
                 <p className="max-w-md mt-1 text-sm">Não há tarefas com responsáveis e prazos definidos nas atas salvas.</p>
               </div>
@@ -666,30 +666,30 @@ const DeadlinePanel: React.FC<DeadlinePanelProps> = ({ isOpen, onClose, onSelect
                     if (filteredTasks.length === 0) return null;
 
                     return (
-                        <div key={responsible} className="border border-gray-200 dark:border-gray-700 rounded-lg">
-                            <button onClick={() => toggleExpand(responsible)} className="w-full flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700/50 hover:bg-gray-100 dark:hover:bg-gray-700">
-                            <span className="font-bold text-gray-800 dark:text-gray-200">{responsible} <span className="text-sm font-normal text-gray-500 dark:text-gray-400">({filteredTasks.length} {filteredTasks.length > 1 ? 'tarefas' : 'tarefa'})</span></span>
-                            <ChevronRightIcon className={`w-5 h-5 text-gray-500 dark:text-gray-400 transform transition-transform ${expandedKeys[responsible] ? 'rotate-90' : ''}`} />
+                        <div key={responsible} className="border border-slate-200 dark:border-slate-700 rounded-lg">
+                            <button onClick={() => toggleExpand(responsible)} className="w-full flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-700/50 hover:bg-slate-100 dark:hover:bg-slate-700">
+                            <span className="font-bold text-slate-800 dark:text-slate-200">{responsible} <span className="text-sm font-normal text-slate-500 dark:text-slate-400">({filteredTasks.length} {filteredTasks.length > 1 ? 'tarefas' : 'tarefa'})</span></span>
+                            <ChevronRightIcon className={`w-5 h-5 text-slate-500 dark:text-slate-400 transform transition-transform ${expandedKeys[responsible] ? 'rotate-90' : ''}`} />
                             </button>
                             {expandedKeys[responsible] && (
                             <div className="p-2 space-y-2">
                                 {filteredTasks.map(task => (
-                                <div key={task.id} className={`p-3 rounded-lg border transition-colors ${task.completed ? 'bg-gray-50 dark:bg-gray-700/40 border-gray-200 dark:border-gray-600' : 'bg-white dark:bg-gray-700/60 border-gray-200 dark:border-gray-600'}`}>
+                                <div key={task.id} className={`p-3 rounded-lg border transition-colors ${task.completed ? 'bg-slate-50 dark:bg-slate-700/40 border-slate-200 dark:border-slate-600' : 'bg-white dark:bg-slate-700/60 border-slate-200 dark:border-slate-600'}`}>
                                     <div className="flex items-start gap-3">
-                                        <input type="checkbox" checked={task.completed} onChange={() => handleToggleCompletion(task)} className="mt-1 h-5 w-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
+                                        <input type="checkbox" checked={task.completed} onChange={() => handleToggleCompletion(task)} className="mt-1 h-5 w-5 rounded border-slate-300 text-blue-600 focus:ring-blue-500" />
                                         <div className="flex-grow">
-                                            <p className={`text-gray-800 dark:text-gray-200 text-sm leading-relaxed ${task.completed ? 'line-through text-gray-500 dark:text-gray-400' : ''}`}>{task.description}</p>
+                                            <p className={`text-slate-800 dark:text-slate-200 text-sm leading-relaxed ${task.completed ? 'line-through text-slate-500 dark:text-slate-400' : ''}`}>{task.description}</p>
                                         </div>
                                         <div className="flex-shrink-0 text-right w-28">
                                             <div className={`px-2 py-1 text-xs font-bold rounded-full inline-block ${statusStyles[task.status]}`}>
                                                 {statusText[task.status]}
                                             </div>
-                                            <p className={`text-sm font-semibold mt-1 ${task.completed ? 'text-gray-500 dark:text-gray-400' : 'text-gray-900 dark:text-gray-100'}`}>{task.deadline}</p>
+                                            <p className={`text-sm font-semibold mt-1 ${task.completed ? 'text-slate-500 dark:text-slate-400' : 'text-slate-900 dark:text-slate-100'}`}>{task.deadline}</p>
                                         </div>
                                     </div>
                                     
-                                    <div className="mt-2 pt-2 border-t border-gray-100 dark:border-gray-600/50 flex justify-between items-center">
-                                        <div className="text-xs text-gray-500 dark:text-gray-400">
+                                    <div className="mt-2 pt-2 border-t border-slate-100 dark:border-slate-600/50 flex justify-between items-center">
+                                        <div className="text-xs text-slate-500 dark:text-slate-400">
                                             <p><span className="font-semibold">Origem:</span> {task.sourceAta.empreendimento} / {task.sourceAta.title} ({task.sourceAta.date})</p>
                                             {task.completed && (
                                                 <div className="flex items-center mt-1">
@@ -698,7 +698,7 @@ const DeadlinePanel: React.FC<DeadlinePanelProps> = ({ isOpen, onClose, onSelect
                                                         type="date" 
                                                         value={convertToInputDate(task.completionDate)} 
                                                         onChange={(e) => handleDateChange(task, e.target.value)}
-                                                        className="p-1 text-xs rounded border-gray-300 dark:border-gray-500 bg-gray-100 dark:bg-gray-600 text-gray-700 dark:text-gray-200"
+                                                        className="p-1 text-xs rounded border-slate-300 dark:border-slate-500 bg-slate-100 dark:bg-slate-600 text-slate-700 dark:text-slate-200"
                                                     />
                                                 </div>
                                             )}
@@ -718,13 +718,13 @@ const DeadlinePanel: React.FC<DeadlinePanelProps> = ({ isOpen, onClose, onSelect
             )}
           </div>
 
-          <div className="p-4 border-t border-gray-200 dark:border-gray-700 flex justify-between items-center">
-            <p className="text-sm text-gray-500 dark:text-gray-400">Total de {tasks.length} tarefas encontradas.</p>
+          <div className="p-4 border-t border-slate-200 dark:border-slate-700 flex justify-between items-center">
+            <p className="text-sm text-slate-500 dark:text-slate-400">Total de {tasks.length} tarefas encontradas.</p>
             <div className="flex gap-3">
-                 <button type="button" onClick={() => setIsBulletinModalOpen(true)} className="inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-blue-600 text-base font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 dark:focus:ring-offset-gray-800">
+                 <button type="button" onClick={() => setIsBulletinModalOpen(true)} className="inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-blue-600 text-base font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 dark:focus:ring-offset-slate-800">
                     Gerar Boletim do Dia
                 </button>
-                <button type="button" onClick={onClose} className="inline-flex justify-center rounded-md border border-gray-300 dark:border-gray-600 shadow-sm px-4 py-2 bg-white dark:bg-gray-700 text-base font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 dark:focus:ring-offset-gray-800">
+                <button type="button" onClick={onClose} className="inline-flex justify-center rounded-md border border-slate-300 dark:border-slate-600 shadow-sm px-4 py-2 bg-white dark:bg-slate-700 text-base font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 dark:focus:ring-offset-slate-800">
                     Fechar
                 </button>
             </div>

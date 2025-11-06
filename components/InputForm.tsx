@@ -27,6 +27,7 @@ interface InputFormProps {
   onClear: () => void;
   isLoading: boolean;
   isEditing: boolean;
+  isGenerateDisabled: boolean;
   onOpenLoadPanel: () => void;
   onOpenDeadlinePanel: () => void;
   onOpenWebhookPanel: () => void;
@@ -37,7 +38,7 @@ interface InputFormProps {
 
 const FormInput: React.FC<{ label: string; id: string; value: string; onChange: (e: React.ChangeEvent<HTMLInputElement>) => void; placeholder?: string; }> = ({ label, id, value, onChange, placeholder }) => (
     <div>
-        <label htmlFor={id} className="block text-sm font-medium text-gray-600 dark:text-gray-300">
+        <label htmlFor={id} className="block text-sm font-medium text-slate-600 dark:text-slate-300">
           {label}
         </label>
         <input
@@ -46,14 +47,14 @@ const FormInput: React.FC<{ label: string; id: string; value: string; onChange: 
           value={value}
           onChange={onChange}
           placeholder={placeholder}
-          className="mt-1 block w-full px-3 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+          className="mt-1 block w-full px-3 py-2 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-md shadow-sm placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
         />
     </div>
 );
 
 
 const InputForm: React.FC<InputFormProps> = (props) => {
-  const { onGenerate, onClear, isLoading, isEditing, vttContent, setVttContent, onOpenLoadPanel, onOpenDeadlinePanel, onOpenWebhookPanel, isAtaGenerated, isCollapsed, onToggleCollapse } = props;
+  const { onGenerate, onClear, isLoading, isEditing, vttContent, setVttContent, onOpenLoadPanel, onOpenDeadlinePanel, onOpenWebhookPanel, isAtaGenerated, isCollapsed, onToggleCollapse, isGenerateDisabled } = props;
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isMammothReady, setIsMammothReady] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -105,6 +106,17 @@ const InputForm: React.FC<InputFormProps> = (props) => {
     
     if (event.target) event.target.value = '';
   };
+  
+  let generateButtonTitle = "Gerar Ata com IA";
+  if (isGenerateDisabled) {
+    if (isEditing) {
+      generateButtonTitle = "Conclua a edição para gerar uma nova ata.";
+    } else if (isLoading) {
+      generateButtonTitle = "Gerando...";
+    } else {
+      generateButtonTitle = "Preencha todos os campos do cabeçalho e da transcrição para habilitar.";
+    }
+  }
 
   if (isCollapsed) {
     return (
@@ -112,33 +124,33 @@ const InputForm: React.FC<InputFormProps> = (props) => {
             <button
                 onClick={onToggleCollapse}
                 title="Expandir Painel de Informações"
-                className="group w-10 h-10 flex items-center justify-center bg-gray-100 dark:bg-gray-800 rounded-full hover:bg-blue-100 dark:hover:bg-blue-900/50 shadow-md hover:shadow-lg transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 dark:focus:ring-offset-gray-900"
+                className="group w-10 h-10 flex items-center justify-center bg-slate-100 dark:bg-slate-800 rounded-full hover:bg-blue-100 dark:hover:bg-blue-900/50 shadow-md hover:shadow-lg transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 dark:focus:ring-offset-slate-900"
                 aria-label="Expandir painel"
             >
-                <ChevronRightIcon className="w-5 h-5 text-gray-600 dark:text-gray-300 group-hover:text-blue-600 dark:group-hover:text-blue-300 transition-colors" />
+                <ChevronRightIcon className="w-5 h-5 text-slate-600 dark:text-slate-300 group-hover:text-blue-600 dark:group-hover:text-blue-300 transition-colors" />
             </button>
         </div>
     );
   }
 
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 space-y-6">
+    <div className="bg-white dark:bg-slate-800 rounded-xl shadow-lg p-6 space-y-6">
       <div className="flex justify-between items-center">
-        <h2 className="text-xl font-bold text-gray-800 dark:text-gray-100">Informações da Ata</h2>
+        <h2 className="text-xl font-bold text-slate-800 dark:text-slate-100">Informações da Ata</h2>
         <div className="flex items-center gap-2">
             {isAtaGenerated && (
                 <button
                     onClick={onToggleCollapse}
-                    className="group w-8 h-8 flex items-center justify-center bg-transparent hover:bg-gray-100 dark:hover:bg-gray-700/60 rounded-full transition-colors"
+                    className="group w-8 h-8 flex items-center justify-center bg-transparent hover:bg-slate-100 dark:hover:bg-slate-700/60 rounded-full transition-colors"
                     title="Recolher Painel"
                 >
-                    <ChevronLeftIcon className="w-5 h-5 text-gray-500 dark:text-gray-400 group-hover:text-blue-600 dark:group-hover:text-blue-400" />
+                    <ChevronLeftIcon className="w-5 h-5 text-slate-500 dark:text-slate-400 group-hover:text-blue-600 dark:group-hover:text-blue-400" />
                 </button>
             )}
            <button 
             onClick={onOpenDeadlinePanel} 
             title="Abrir painel de controle de prazos"
-            className="inline-flex items-center text-sm font-medium text-gray-600 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400"
+            className="inline-flex items-center text-sm font-medium text-slate-600 dark:text-slate-300 hover:text-blue-600 dark:hover:text-blue-400"
           >
               <CalendarCheckIcon className="w-5 h-5 mr-2" />
               Prazos
@@ -146,7 +158,7 @@ const InputForm: React.FC<InputFormProps> = (props) => {
            <button 
             onClick={onOpenWebhookPanel} 
             title="Gerenciar webhooks do Microsoft Teams"
-            className="inline-flex items-center text-sm font-medium text-gray-600 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400"
+            className="inline-flex items-center text-sm font-medium text-slate-600 dark:text-slate-300 hover:text-blue-600 dark:hover:text-blue-400"
           >
               <SendIcon className="w-5 h-5 mr-2" />
               Webhooks
@@ -155,12 +167,12 @@ const InputForm: React.FC<InputFormProps> = (props) => {
             onClick={onOpenLoadPanel} 
             disabled={isEditing}
             title={isEditing ? "Conclua a edição para poder carregar" : "Carregar Ata Salva da Nuvem"}
-            className="inline-flex items-center text-sm font-medium text-gray-600 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="inline-flex items-center text-sm font-medium text-slate-600 dark:text-slate-300 hover:text-blue-600 dark:hover:text-blue-400 disabled:opacity-50 disabled:cursor-not-allowed"
           >
               <DownloadCloudIcon className="w-5 h-5 mr-2" />
               Carregar
           </button>
-          <button onClick={() => setIsSettingsOpen(true)} className="inline-flex items-center text-sm font-medium text-gray-600 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400">
+          <button onClick={() => setIsSettingsOpen(true)} className="inline-flex items-center text-sm font-medium text-slate-600 dark:text-slate-300 hover:text-blue-600 dark:hover:text-blue-400">
               <SettingsIcon className="w-5 h-5 mr-2" />
               Config.
           </button>
@@ -169,7 +181,7 @@ const InputForm: React.FC<InputFormProps> = (props) => {
       
       <CollapsibleSection title="1. Detalhes do Cabeçalho" defaultOpen={true}>
         <div>
-            <label htmlFor="empreendimento" className="block text-sm font-medium text-gray-600 dark:text-gray-300">
+            <label htmlFor="empreendimento" className="block text-sm font-medium text-slate-600 dark:text-slate-300">
                 Empreendimento
             </label>
             <div className="mt-1 flex items-center gap-2">
@@ -177,7 +189,7 @@ const InputForm: React.FC<InputFormProps> = (props) => {
                     id="empreendimento"
                     value={props.empreendimento}
                     onChange={(e) => props.setEmpreendimento(e.target.value)}
-                    className="block w-full px-3 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 disabled:opacity-75"
+                    className="block w-full px-3 py-2 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 disabled:opacity-75"
                     disabled={props.isProjectsLoading}
                 >
                     <option value="">{props.isProjectsLoading ? 'Carregando...' : 'Selecione um empreendimento'}</option>
@@ -187,8 +199,8 @@ const InputForm: React.FC<InputFormProps> = (props) => {
                         </option>
                     ))}
                 </select>
-                <button type="button" onClick={props.onOpenProjectPanel} title="Gerenciar Empreendimentos" className="p-2.5 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-md border border-gray-300 dark:border-gray-600">
-                    <EditIcon className="w-5 h-5 text-gray-600 dark:text-gray-300" />
+                <button type="button" onClick={props.onOpenProjectPanel} title="Gerenciar Empreendimentos" className="p-2.5 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 rounded-md border border-slate-300 dark:border-slate-600">
+                    <EditIcon className="w-5 h-5 text-slate-600 dark:text-slate-300" />
                 </button>
             </div>
         </div>
@@ -199,34 +211,39 @@ const InputForm: React.FC<InputFormProps> = (props) => {
       </CollapsibleSection>
 
       <CollapsibleSection title="2. Transcrição da Reunião" defaultOpen={true}>
-        <p className="text-sm text-gray-500 dark:text-gray-400">
+        <p className="text-sm text-slate-500 dark:text-slate-400">
           Cole o conteúdo da transcrição ou importe um arquivo DOCX ou VTT.
         </p>
         <textarea
           value={vttContent}
           onChange={(e) => setVttContent(e.target.value)}
           placeholder="Cole a transcrição ou use o botão de importação..."
-          className="w-full h-48 p-3 font-mono text-sm bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-blue-500 focus:border-blue-500 resize-y"
+          className="w-full h-48 p-3 font-mono text-sm bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-md focus:ring-blue-500 focus:border-blue-500 resize-y"
         />
         <input type="file" ref={fileInputRef} onChange={handleFileChange} accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document,.vtt,text/vtt" className="hidden" aria-hidden="true" />
+        <button onClick={() => fileInputRef.current?.click()} disabled={isLoading || !isMammothReady} title={!isMammothReady ? "Aguardando..." : "Importar arquivo .docx ou .vtt"} className={`inline-flex items-center justify-center px-4 py-2 border border-slate-300 dark:border-slate-600 text-sm font-medium rounded-md shadow-sm text-slate-700 dark:text-slate-200 bg-white dark:bg-slate-700 hover:bg-slate-50 dark:hover:bg-slate-600 disabled:opacity-50 ${!isMammothReady && !isLoading ? 'animate-pulse' : ''}`}>
+          <UploadCloudIcon className="-ml-1 mr-2 h-5 w-5" />
+          {isMammothReady ? 'Importar Arquivo' : 'Carregando...'}
+        </button>
       </CollapsibleSection>
 
-      <div className="space-y-3 pt-4 border-t dark:border-gray-700">
+      <div className="space-y-3 pt-4 border-t dark:border-slate-700">
         <button
           onClick={onGenerate}
-          disabled={isLoading || isEditing}
-          title={isEditing ? "Conclua a edição para gerar uma nova ata." : "Gerar Ata com IA"}
-          className="w-full inline-flex items-center justify-center px-4 py-3 border border-transparent text-base font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:bg-blue-300 disabled:cursor-not-allowed dark:focus:ring-offset-gray-800"
+          disabled={isGenerateDisabled}
+          title={generateButtonTitle}
+          className="w-full inline-flex items-center justify-center px-4 py-3 border border-transparent text-base font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:bg-blue-300 disabled:cursor-not-allowed dark:focus:ring-offset-slate-800"
         >
           <SparklesIcon className="-ml-1 mr-3 h-5 w-5" />
           {isLoading ? 'Gerando...' : 'Gerar Ata com IA'}
         </button>
         <div className="flex gap-3">
-          <button onClick={() => fileInputRef.current?.click()} disabled={isLoading || !isMammothReady} title={!isMammothReady ? "Aguardando..." : "Importar arquivo .docx ou .vtt"} className={`flex-1 inline-flex items-center justify-center px-4 py-2 border border-gray-300 dark:border-gray-600 text-sm font-medium rounded-md shadow-sm text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 disabled:opacity-50 ${!isMammothReady && !isLoading ? 'animate-pulse' : ''}`}>
-            <UploadCloudIcon className="-ml-1 mr-2 h-5 w-5" />
-            {isMammothReady ? 'Importar Arquivo' : 'Carregando...'}
-          </button>
-          <button onClick={onClear} disabled={isLoading} title="Iniciar uma nova ata e limpar todos os campos" className="flex-1 inline-flex items-center justify-center px-4 py-2 border border-gray-300 dark:border-gray-600 text-sm font-medium rounded-md shadow-sm text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 disabled:opacity-50">
+          <button 
+            onClick={onClear} 
+            disabled={isLoading || !isAtaGenerated} 
+            title={isAtaGenerated ? "Limpar campos e ata gerada para iniciar uma nova" : "Gere ou carregue uma ata para habilitar esta opção"} 
+            className="flex-1 inline-flex items-center justify-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 dark:focus:ring-offset-slate-800 disabled:opacity-50"
+          >
             <PlusIcon className="-ml-1 mr-2 h-5 w-5" />
             <span>Nova Ata</span>
           </button>

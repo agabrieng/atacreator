@@ -98,16 +98,16 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ allProfiles, currentCompa
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 z-40 flex items-center justify-center" onClick={onClose}>
-      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl p-6 m-4 w-full max-w-lg space-y-4 relative" onClick={(e) => e.stopPropagation()}>
-        <button onClick={onClose} className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200">
+      <div className="bg-white dark:bg-slate-800 rounded-xl shadow-2xl p-6 m-4 w-full max-w-lg space-y-4 relative" onClick={(e) => e.stopPropagation()}>
+        <button onClick={onClose} className="absolute top-4 right-4 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">
             <XIcon className="w-6 h-6" />
         </button>
-        <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-100">Configurações Gerais</h2>
+        <h2 className="text-2xl font-bold text-slate-800 dark:text-slate-100">Configurações Gerais</h2>
         
         <div className="space-y-2">
-            <label htmlFor="company-select" className="block text-sm font-medium text-gray-600 dark:text-gray-300">Perfil da Empresa</label>
+            <label htmlFor="company-select" className="block text-sm font-medium text-slate-600 dark:text-slate-300">Perfil da Empresa</label>
             <div className="flex items-center gap-2">
-                <select id="company-select" value={isCreating ? '__new__' : selectedCompany} onChange={handleCompanySelect} className="block w-full px-3 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+                <select id="company-select" value={isCreating ? '__new__' : selectedCompany} onChange={handleCompanySelect} className="block w-full px-3 py-2 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
                     {Object.keys(allProfiles).map(name => (
                         <option key={name} value={name}>{name}</option>
                     ))}
@@ -123,22 +123,22 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ allProfiles, currentCompa
 
         {isCreating ? (
             <div>
-                <label htmlFor="new-company-name" className="block text-sm font-medium text-gray-600 dark:text-gray-300">Nome da Nova Empresa</label>
-                <input id="new-company-name" type="text" value={newCompanyName} onChange={(e) => setNewCompanyName(e.target.value)} placeholder="Digite o nome da empresa" className="mt-1 block w-full px-3 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm" />
+                <label htmlFor="new-company-name" className="block text-sm font-medium text-slate-600 dark:text-slate-300">Nome da Nova Empresa</label>
+                <input id="new-company-name" type="text" value={newCompanyName} onChange={(e) => setNewCompanyName(e.target.value)} placeholder="Digite o nome da empresa" className="mt-1 block w-full px-3 py-2 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-md shadow-sm" />
             </div>
         ) : (
             <div>
-                <label className="block text-sm font-medium text-gray-600 dark:text-gray-300">Nome da Empresa</label>
-                <input type="text" value={currentSettings?.companyName || ''} disabled className="mt-1 block w-full px-3 py-2 bg-gray-100 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm" />
+                <label className="block text-sm font-medium text-slate-600 dark:text-slate-300">Nome da Empresa</label>
+                <input type="text" value={currentSettings?.companyName || ''} disabled className="mt-1 block w-full px-3 py-2 bg-slate-100 dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-md shadow-sm" />
             </div>
         )}
         
         <div className="flex items-center space-x-4 pt-2">
-            <div className="w-24 h-24 bg-gray-100 dark:bg-gray-700 rounded-md flex items-center justify-center overflow-hidden">
-                {currentSettings?.companyLogo ? <img src={currentSettings.companyLogo} alt="Logo" className="w-full h-full object-contain" /> : <span className="text-xs text-gray-500">Logo</span>}
+            <div className="w-24 h-24 bg-slate-100 dark:bg-slate-700 rounded-md flex items-center justify-center overflow-hidden">
+                {currentSettings?.companyLogo ? <img src={currentSettings.companyLogo} alt="Logo" className="w-full h-full object-contain" /> : <span className="text-xs text-slate-500">Logo</span>}
             </div>
             <div>
-                 <label htmlFor="logo-upload" className="cursor-pointer inline-flex items-center px-4 py-2 border border-gray-300 dark:border-gray-600 text-sm font-medium rounded-md shadow-sm text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600">
+                 <label htmlFor="logo-upload" className="cursor-pointer inline-flex items-center px-4 py-2 border border-slate-300 dark:border-slate-600 text-sm font-medium rounded-md shadow-sm text-slate-700 dark:text-slate-200 bg-white dark:bg-slate-700 hover:bg-slate-50 dark:hover:bg-slate-600">
                     <CameraIcon className="-ml-1 mr-2 h-5 w-5" />
                     Carregar Logo
                 </label>
@@ -148,19 +148,19 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ allProfiles, currentCompa
         </div>
 
         <div>
-            <label htmlFor="doc-number" className="block text-sm font-medium text-gray-600 dark:text-gray-300">Nº do Documento Padrão</label>
-            <input id="doc-number" type="text" value={currentSettings?.docNumber || ''} onChange={(e) => handleInputChange('docNumber', e.target.value)} className="mt-1 block w-full px-3 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm" />
+            <label htmlFor="doc-number" className="block text-sm font-medium text-slate-600 dark:text-slate-300">Nº do Documento Padrão</label>
+            <input id="doc-number" type="text" value={currentSettings?.docNumber || ''} onChange={(e) => handleInputChange('docNumber', e.target.value)} className="mt-1 block w-full px-3 py-2 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-md shadow-sm" />
         </div>
         <div>
-            <label htmlFor="revision" className="block text-sm font-medium text-gray-600 dark:text-gray-300">Revisão Padrão</label>
-            <input id="revision" type="text" value={currentSettings?.revision || ''} onChange={(e) => handleInputChange('revision', e.target.value)} className="mt-1 block w-full px-3 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm" />
+            <label htmlFor="revision" className="block text-sm font-medium text-slate-600 dark:text-slate-300">Revisão Padrão</label>
+            <input id="revision" type="text" value={currentSettings?.revision || ''} onChange={(e) => handleInputChange('revision', e.target.value)} className="mt-1 block w-full px-3 py-2 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-md shadow-sm" />
         </div>
         <div>
-            <label htmlFor="property-info" className="block text-sm font-medium text-gray-600 dark:text-gray-300">Informação de Propriedade (Rodapé)</label>
-            <textarea id="property-info" value={currentSettings?.propertyInfo || ''} onChange={(e) => handleInputChange('propertyInfo', e.target.value)} rows={3} className="mt-1 block w-full px-3 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm resize-y" />
+            <label htmlFor="property-info" className="block text-sm font-medium text-slate-600 dark:text-slate-300">Informação de Propriedade (Rodapé)</label>
+            <textarea id="property-info" value={currentSettings?.propertyInfo || ''} onChange={(e) => handleInputChange('propertyInfo', e.target.value)} rows={3} className="mt-1 block w-full px-3 py-2 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-md shadow-sm resize-y" />
         </div>
 
-        <div className="flex justify-end pt-4 border-t dark:border-gray-700">
+        <div className="flex justify-end pt-4 border-t dark:border-slate-700">
             <button onClick={handleSave} className="px-6 py-2 border border-transparent text-base font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700">
                 Salvar e Fechar
             </button>

@@ -46,7 +46,7 @@ const ActionButton: React.FC<{
         onClick={onClick}
         disabled={disabled}
         title={title}
-        className={`inline-flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-2 dark:focus:ring-offset-gray-900 transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${className}`}
+        className={`inline-flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-2 dark:focus:ring-offset-slate-900 transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${className}`}
     >
         {children}
     </button>
@@ -79,7 +79,7 @@ const Toast: React.FC<ToastProps> = ({ message, type, onClose }) => {
         </div>
         <div className="ml-auto pl-3">
           <div className="-mx-1.5 -my-1.5">
-            <button onClick={onClose} className={`inline-flex rounded-md p-1.5 focus:outline-none focus:ring-2 focus:ring-offset-2 ${isSuccess ? 'hover:bg-green-200/50 dark:hover:bg-green-800/50 focus:ring-green-600 focus:ring-offset-green-100 dark:focus:ring-offset-green-900' : 'hover:bg-red-200/50 dark:hover:bg-red-800/50 focus:ring-red-600 focus:ring-offset-red-100 dark:focus:ring-offset-red-900'}`}>
+            <button onClick={onClose} className={`inline-flex rounded-md p-1.5 focus:outline-none focus:ring-2 focus:ring-offset-2 ${isSuccess ? 'hover:bg-green-200/50 dark:hover:bg-green-800/50 focus:ring-green-600 focus:ring-offset-green-100 dark:focus:ring-offset-slate-900' : 'hover:bg-red-200/50 dark:hover:bg-red-800/50 focus:ring-red-600 focus:ring-offset-red-100 dark:focus:ring-offset-slate-900'}`}>
               <span className="sr-only">Fechar</span>
               <XIcon className="h-5 w-5" />
             </button>
@@ -339,10 +339,6 @@ const App: React.FC = () => {
   };
 
   const handleGenerate = useCallback(async () => {
-    if (!vttContent.trim() || !titulo.trim() || !empreendimento.trim()) {
-      setError('Por favor, preencha o Título, Empreendimento e a Transcrição.');
-      return;
-    }
     if (!adminSettings) {
       setError("As configurações da empresa não foram carregadas. Por favor, verifique as configurações e selecione uma empresa.");
       return;
@@ -605,7 +601,7 @@ const App: React.FC = () => {
 
 
   return (
-    <div className="min-h-screen bg-gray-50 text-gray-800 dark:bg-gray-900 dark:text-gray-200 font-sans">
+    <div className="min-h-screen bg-slate-50 text-slate-800 dark:bg-slate-900 dark:text-slate-200 font-sans">
       <Header />
       <main className="container mx-auto p-4 md:p-8">
         <div className={`grid grid-cols-1 ${ata ? `lg:grid lg:grid-cols-[${isFormCollapsed ? 'auto_1fr' : 'minmax(450px,_5fr)_7fr'}]` : 'lg:grid-cols-2'} gap-8 items-start`}>
@@ -627,6 +623,7 @@ const App: React.FC = () => {
                     onClear={() => setShowClearConfirmation(true)}
                     isLoading={isLoading}
                     isEditing={isEditing}
+                    isGenerateDisabled={isLoading || isEditing || !empreendimento.trim() || !area.trim() || !titulo.trim() || !assunto.trim() || !local.trim() || !vttContent.trim()}
                     onOpenLoadPanel={handleOpenLoadPanel}
                     onOpenDeadlinePanel={() => setIsDeadlinePanelOpen(true)}
                     onOpenWebhookPanel={() => setIsWebhookPanelOpen(true)}
@@ -635,13 +632,13 @@ const App: React.FC = () => {
                     onToggleCollapse={() => setIsFormCollapsed(!isFormCollapsed)}
                 />
             </div>
-          <div className="relative lg:sticky top-8 bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 min-h-[calc(100vh-10rem)] transition-all duration-300 ease-in-out">
+          <div className="relative lg:sticky top-8 bg-white dark:bg-slate-800 rounded-xl shadow-lg p-6 min-h-[calc(100vh-10rem)] transition-all duration-300 ease-in-out">
             {(isLoading && !error) && <Loader />}
             {error && (
               <div className="flex flex-col items-center justify-center h-full text-center p-4">
                 <AlertTriangleIcon className="w-16 h-16 mb-4 text-red-500" />
-                <h3 className="text-xl font-semibold mb-3 text-gray-800 dark:text-gray-100">Ocorreu um Erro</h3>
-                <div className="max-w-2xl w-full bg-red-50 dark:bg-gray-700/50 text-red-700 dark:text-red-300 p-4 rounded-lg text-left font-mono text-sm overflow-auto">
+                <h3 className="text-xl font-semibold mb-3 text-slate-800 dark:text-slate-100">Ocorreu um Erro</h3>
+                <div className="max-w-2xl w-full bg-red-50 dark:bg-slate-700/50 text-red-700 dark:text-red-300 p-4 rounded-lg text-left font-mono text-sm overflow-auto">
                     <pre className="whitespace-pre-wrap break-words">{error}</pre>
                 </div>
               </div>
@@ -649,11 +646,11 @@ const App: React.FC = () => {
             {!isLoading && !error && (
               <>
                 {ata && (
-                  <div className="flex flex-wrap items-center gap-2 mb-4 pb-4 border-b border-gray-200 dark:border-gray-700">
+                  <div className="flex flex-wrap items-center gap-2 mb-4 pb-4 border-b border-slate-200 dark:border-slate-700">
                      <ActionButton
                         onClick={handleToggleEditing}
                         title={isEditing ? "Concluir Edição" : "Editar Ata"}
-                        className={isEditing ? 'bg-green-600 text-white hover:bg-green-700 focus:ring-green-500' : 'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-200 border border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600 focus:ring-blue-500'}
+                        className={isEditing ? 'bg-green-600 text-white hover:bg-green-700 focus:ring-green-500' : 'bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-200 border border-slate-300 dark:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-600 focus:ring-blue-500'}
                     >
                         {isEditing ? <CheckIcon className="w-5 h-5" /> : <EditIcon className="w-5 h-5" />}
                         <span>{isEditing ? "Concluir" : "Editar"}</span>
@@ -662,7 +659,7 @@ const App: React.FC = () => {
                         onClick={handleCopy}
                         disabled={isEditing}
                         title={isEditing ? "Conclua a edição para poder copiar" : "Copiar Dados (JSON)"}
-                        className="bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-200 border border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600 focus:ring-blue-500"
+                        className="bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-200 border border-slate-300 dark:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-600 focus:ring-blue-500"
                     >
                          {copied ? <CheckIcon className="w-5 h-5 text-green-500" /> : <CopyIcon className="w-5 h-5" />}
                         <span>Copiar</span>
@@ -671,7 +668,7 @@ const App: React.FC = () => {
                         onClick={handleSave}
                         disabled={isEditing || isSaving}
                         title={isEditing ? "Conclua a edição para poder salvar" : "Salvar na nuvem"}
-                        className="bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-200 border border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600 focus:ring-blue-500"
+                        className="bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-200 border border-slate-300 dark:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-600 focus:ring-blue-500"
                     >
                         {isSaving ? (
                             <div className="w-5 h-5 border-2 border-current border-t-transparent rounded-full animate-spin" role="status">

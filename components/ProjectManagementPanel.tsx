@@ -117,19 +117,19 @@ const ProjectManagementPanel: React.FC<ProjectManagementPanelProps> = ({
   return (
     <>
       <div className="fixed inset-0 bg-black bg-opacity-60 z-40 flex items-center justify-center p-4" onClick={onClose}>
-        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl p-6 m-4 w-full max-w-lg flex flex-col h-[70vh] relative" onClick={(e) => e.stopPropagation()}>
-          <button onClick={onClose} className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200">
+        <div className="bg-white dark:bg-slate-800 rounded-xl shadow-2xl p-6 m-4 w-full max-w-lg flex flex-col h-[70vh] relative" onClick={(e) => e.stopPropagation()}>
+          <button onClick={onClose} className="absolute top-4 right-4 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">
             <XIcon className="w-6 h-6" />
           </button>
-          <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-100 mb-4">Gerenciar Empreendimentos</h2>
+          <h2 className="text-2xl font-bold text-slate-800 dark:text-slate-100 mb-4">Gerenciar Empreendimentos</h2>
           
-          <form onSubmit={handleAddProject} className="space-y-3 mb-4 pb-4 border-b dark:border-gray-700">
+          <form onSubmit={handleAddProject} className="space-y-3 mb-4 pb-4 border-b dark:border-slate-700">
             <input
               type="text"
               value={newProjectName}
               onChange={(e) => setNewProjectName(e.target.value)}
               placeholder="Nome do novo empreendimento"
-              className="w-full px-3 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm"
+              className="w-full px-3 py-2 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-md shadow-sm"
               disabled={panelState.mode !== 'idle'}
             />
             <input
@@ -137,7 +137,7 @@ const ProjectManagementPanel: React.FC<ProjectManagementPanelProps> = ({
               value={newProjectContrato}
               onChange={(e) => setNewProjectContrato(e.target.value)}
               placeholder="Número ou nome do contrato"
-              className="w-full px-3 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm"
+              className="w-full px-3 py-2 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-md shadow-sm"
               disabled={panelState.mode !== 'idle'}
             />
             <button type="submit" className="w-full inline-flex items-center justify-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400" disabled={panelState.mode !== 'idle' || !newProjectName.trim() || !newProjectContrato.trim()}>
@@ -148,7 +148,7 @@ const ProjectManagementPanel: React.FC<ProjectManagementPanelProps> = ({
 
           <div className="flex-grow overflow-y-auto pr-2 -mr-2">
             {projects.length === 0 ? (
-              <p className="text-center text-gray-500 dark:text-gray-400 mt-8">Nenhum empreendimento cadastrado.</p>
+              <p className="text-center text-slate-500 dark:text-slate-400 mt-8">Nenhum empreendimento cadastrado.</p>
             ) : (
               <ul className="space-y-2">
                 {projects.map((project) => {
@@ -157,14 +157,14 @@ const ProjectManagementPanel: React.FC<ProjectManagementPanelProps> = ({
                   const isDeletingThis = panelState.mode === 'deleting' && panelState.id === project.id;
 
                   return (
-                    <li key={project.id} className={`p-3 bg-gray-50 dark:bg-gray-700/50 rounded-md transition-opacity ${isDeletingThis ? 'opacity-50' : ''}`}>
+                    <li key={project.id} className={`p-3 bg-slate-50 dark:bg-slate-700/50 rounded-md transition-opacity ${isDeletingThis ? 'opacity-50' : ''}`}>
                       {isEditingThis ? (
                         <div className="space-y-2">
                           <input
                             type="text"
                             value={editingName}
                             onChange={(e) => setEditingName(e.target.value)}
-                            className="w-full px-2 py-1 bg-white dark:bg-gray-900 border border-blue-400 rounded-md"
+                            className="w-full px-2 py-1 bg-white dark:bg-slate-900 border border-blue-400 rounded-md"
                             autoFocus
                             disabled={isUpdatingThis}
                           />
@@ -172,7 +172,7 @@ const ProjectManagementPanel: React.FC<ProjectManagementPanelProps> = ({
                             type="text"
                             value={editingContrato}
                             onChange={(e) => setEditingContrato(e.target.value)}
-                            className="w-full px-2 py-1 bg-white dark:bg-gray-900 border border-blue-400 rounded-md"
+                            className="w-full px-2 py-1 bg-white dark:bg-slate-900 border border-blue-400 rounded-md"
                             disabled={isUpdatingThis}
                             onKeyDown={(e) => {if(e.key === 'Enter') handleUpdateProject()}}
                           />
@@ -180,7 +180,7 @@ const ProjectManagementPanel: React.FC<ProjectManagementPanelProps> = ({
                             <button onClick={handleUpdateProject} className="p-2 text-green-600 hover:bg-green-100 dark:hover:bg-green-900/50 rounded-full disabled:opacity-50" disabled={isUpdatingThis || !editingName.trim() || !editingContrato.trim()}>
                                 <CheckIcon className="w-5 h-5" />
                             </button>
-                            <button onClick={handleCancelEdit} className="p-2 text-gray-500 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-full" disabled={isUpdatingThis}>
+                            <button onClick={handleCancelEdit} className="p-2 text-slate-500 hover:bg-slate-200 dark:hover:bg-slate-600 rounded-full" disabled={isUpdatingThis}>
                                 <XIcon className="w-5 h-5" />
                             </button>
                           </div>
@@ -188,14 +188,14 @@ const ProjectManagementPanel: React.FC<ProjectManagementPanelProps> = ({
                       ) : (
                         <div className="flex items-center justify-between">
                             <div>
-                                <p className="text-gray-800 dark:text-gray-200 font-semibold">{project.name}</p>
-                                <p className="text-xs text-gray-500 dark:text-gray-400">Contrato: {project.contrato}</p>
+                                <p className="text-slate-800 dark:text-slate-200 font-semibold">{project.name}</p>
+                                <p className="text-xs text-slate-500 dark:text-slate-400">Contrato: {project.contrato}</p>
                             </div>
                             <div className="flex items-center gap-2 flex-shrink-0">
-                                <button onClick={() => handleStartEdit(project)} className="p-2 text-gray-500 hover:text-blue-600 hover:bg-blue-100 dark:hover:bg-blue-900/50 rounded-full disabled:opacity-50 disabled:cursor-not-allowed" disabled={panelState.mode !== 'idle'}>
+                                <button onClick={() => handleStartEdit(project)} className="p-2 text-slate-500 hover:text-blue-600 hover:bg-blue-100 dark:hover:bg-blue-900/50 rounded-full disabled:opacity-50 disabled:cursor-not-allowed" disabled={panelState.mode !== 'idle'}>
                                 <EditIcon className="w-4 h-4" />
                                 </button>
-                                <button onClick={() => handleDeleteRequest(project)} className="p-2 text-gray-500 hover:text-red-600 hover:bg-red-100 dark:hover:bg-red-900/50 rounded-full disabled:opacity-50 disabled:cursor-not-allowed" disabled={panelState.mode !== 'idle'}>
+                                <button onClick={() => handleDeleteRequest(project)} className="p-2 text-slate-500 hover:text-red-600 hover:bg-red-100 dark:hover:bg-red-900/50 rounded-full disabled:opacity-50 disabled:cursor-not-allowed" disabled={panelState.mode !== 'idle'}>
                                 <TrashIcon className={`w-4 h-4 ${isDeletingThis ? 'animate-pulse' : ''}`} />
                                 </button>
                             </div>
