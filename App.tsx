@@ -3,8 +3,6 @@ import type { AtaData, AdminSettings, Participant, PautaItem, Empreendimento, We
 import { generateAtaData } from './services/geminiService';
 import { 
     saveAtaToFirebase, 
-    loadAtasFromFirebase, 
-    deleteAtaFromFirebase, 
     getEmpreendimentos, 
     addEmpreendimento, 
     updateEmpreendimento, 
@@ -131,16 +129,6 @@ const AtaCreatorView: React.FC<{
   const [copied, setCopied] = useState(false);
   const [isExportReady, setIsExportReady] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
-  
-  // State for loading saved atas
-  const [savedAtas, setSavedAtas] = useState<AtaData[]>([]);
-  const [isSavedAtasLoading, setIsSavedAtasLoading] = useState(false);
-  const [showLoadPanel, setShowLoadPanel] = useState(false);
-  const [loadError, setLoadError] = useState<string | null>(null);
-
-  // State for deleting atas
-  const [showDeleteConfirmation, setShowDeleteConfirmation] = useState(false);
-  const [ataToDelete, setAtaToDelete] = useState<AtaData | null>(null);
 
   // State for Projects (Empreendimentos)
   const [empreendimentos, setEmpreendimentos] = useState<Empreendimento[]>([]);
@@ -218,7 +206,6 @@ const AtaCreatorView: React.FC<{
       setAssunto(selectedAta.assunto || '');
       setLocal(selectedAta.local || '');
       setVttContent('');
-      setShowLoadPanel(false);
       setIsEditing(true); // Abrir em modo de edição
       setIsFormCollapsed(true);
     }, []);
@@ -424,46 +411,6 @@ const AtaCreatorView: React.FC<{
     }
   }, [ata, originalLoadedAta, setToast]);
   
-  const handleOpenLoadPanel = useCallback(async () => {
-    setShowLoadPanel(true);
-    setIsSavedAtasLoading(true);
-    setLoadError(null);
-    try {
-        const loadedAtas = await loadAtasFromFirebase();
-        // Sorting can be done here if a consistent date/time field is available
-        // For now, Firebase returns them ordered by last update
-        setSavedAtas(loadedAtas);
-    } catch (error: any) {
-        console.error("Failed to load atas from Firebase:", error);
-        setLoadError(`Não foi possível carregar as atas do Firebase: ${error.message}`);
-    } finally {
-        setIsSavedAtasLoading(false);
-    }
-  }, []);
-
-  const handleDeleteClick = (ata: AtaData) => {
-    setAtaToDelete(ata);
-    setShowDeleteConfirmation(true);
-  };
-
-  const onConfirmDelete = async () => {
-    if (!ataToDelete || !ataToDelete.id) return;
-    try {
-      await deleteAtaFromFirebase(ataToDelete.id);
-      setSavedAtas(prev => prev.filter(a => a.id !== ataToDelete.id));
-      if (ata?.id === ataToDelete.id) {
-        handleClear();
-      }
-      setToast({ message: 'Ata excluída com sucesso!', type: 'success' });
-    } catch (error: any) {
-      console.error("Failed to delete ata:", error);
-      setToast({ message: `Erro ao excluir a ata: ${error.message}`, type: 'error' });
-    } finally {
-      setShowDeleteConfirmation(false);
-      setAtaToDelete(null);
-    }
-  };
-  
   const handleCopy = useCallback(() => {
       if (!ata) return;
       navigator.clipboard.writeText(JSON.stringify(ata, null, 2));
@@ -528,7 +475,6 @@ const AtaCreatorView: React.FC<{
                     isLoading={isLoading}
                     isEditing={isEditing}
                     isGenerateDisabled={isLoading || isEditing || !empreendimento.trim() || !area.trim() || !titulo.trim() || !assunto.trim() || !local.trim() || !vttContent.trim()}
-                    onOpenLoadPanel={handleOpenLoadPanel}
                     isAtaGenerated={!!ata}
                     isCollapsed={isFormCollapsed && !!ata}
                     onToggleCollapse={() => setIsFormCollapsed(!isFormCollapsed)}
@@ -599,15 +545,6 @@ const AtaCreatorView: React.FC<{
           </div>
         </div>
       </main>
-      <SavedAtasPanel
-        isOpen={showLoadPanel}
-        isLoading={isSavedAtasLoading}
-        error={loadError}
-        atas={savedAtas}
-        onClose={() => setShowLoadPanel(false)}
-        onSelect={handleSelectSavedAta}
-        onDelete={handleDeleteClick}
-      />
        <ProjectManagementPanel
         isOpen={isProjectPanelOpen}
         onClose={() => setIsProjectPanelOpen(false)}
@@ -656,19 +593,6 @@ const AtaCreatorView: React.FC<{
         hideCancel={true}
       >
         Todos os responsáveis devem ter um prazo definido. Por favor, preencha as datas pendentes destacadas em vermelho antes de concluir a edição.
-      </ConfirmationDialog>
-      <ConfirmationDialog
-        isOpen={showDeleteConfirmation}
-        onClose={() => setShowDeleteConfirmation(false)}
-        onConfirm={onConfirmDelete}
-        title="Confirmar Exclusão"
-        icon="alert"
-        confirmText="Excluir"
-      >
-        Tem certeza de que deseja excluir permanentemente a ata{' '}
-        <strong>"{ataToDelete?.titulo}"</strong> de <strong>{ataToDelete?.data}</strong>?
-        <br/><br/>
-        Esta ação não pode ser desfeita.
       </ConfirmationDialog>
     </>
   );
