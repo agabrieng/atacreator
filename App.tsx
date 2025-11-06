@@ -24,6 +24,8 @@ import SavedAtasPanel from './components/SavedAtasPanel';
 import ProjectManagementPanel from './components/ProjectManagementPanel';
 import DeadlinePanel from './components/DeadlinePanel';
 import WebhookPanel from './components/WebhookPanel';
+import Sidebar from './components/Sidebar';
+import Dashboard from './components/Dashboard';
 import { AlertTriangleIcon, EditIcon, CheckIcon, CopyIcon, UploadCloudIcon, DownloadCloudIcon, FilePdfIcon, CheckCircleIcon, XIcon } from './components/icons';
 
 const DEFAULT_COMPANY_NAME = "Minha Empresa";
@@ -34,6 +36,8 @@ const DEFAULT_SETTINGS: AdminSettings = {
     revision: '00',
     propertyInfo: 'AS INFORMAÇÕES DESTE DOCUMENTO SÃO DE PROPRIEDADE DA SUA EMPRESA, SENDO PROIBIDA A UTILIZAÇÃO FORA DA SUA FINALIDADE.',
 };
+
+type View = 'dashboard' | 'ataCreator';
 
 const ActionButton: React.FC<{
     onClick?: () => void;
@@ -91,7 +95,7 @@ const Toast: React.FC<ToastProps> = ({ message, type, onClose }) => {
 };
 
 
-const App: React.FC = () => {
+const AtaCreatorView: React.FC = () => {
   const [companyProfiles, setCompanyProfiles] = useState<Record<string, AdminSettings>>({});
   const [currentCompanyName, setCurrentCompanyName] = useState<string>('');
   
@@ -601,7 +605,7 @@ const App: React.FC = () => {
 
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-800 dark:bg-slate-900 dark:text-slate-200 font-sans">
+    <>
       <Header />
       <main className="container mx-auto p-4 md:p-8">
         <div className={`grid grid-cols-1 ${ata ? `lg:grid lg:grid-cols-[${isFormCollapsed ? 'auto_1fr' : 'minmax(450px,_5fr)_7fr'}]` : 'lg:grid-cols-2'} gap-8 items-start`}>
@@ -784,6 +788,21 @@ const App: React.FC = () => {
         <br/><br/>
         Esta ação não pode ser desfeita.
       </ConfirmationDialog>
+    </>
+  );
+};
+
+
+const App: React.FC = () => {
+  const [currentView, setCurrentView] = useState<View>('dashboard');
+
+  return (
+    <div className="min-h-screen bg-slate-100 dark:bg-slate-900 text-slate-800 dark:text-slate-200 font-sans flex">
+      <Sidebar currentView={currentView} setCurrentView={setCurrentView} />
+      <div className="flex-1 w-full pl-64">
+        {currentView === 'dashboard' && <Dashboard />}
+        {currentView === 'ataCreator' && <AtaCreatorView />}
+      </div>
     </div>
   );
 };
