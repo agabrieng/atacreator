@@ -5,9 +5,6 @@ import SettingsPanel from './SettingsPanel';
 import CollapsibleSection from './CollapsibleSection';
 
 interface InputFormProps {
-  companyProfiles: Record<string, AdminSettings>;
-  currentCompanyName: string;
-  onSettingsSave: (profiles: Record<string, AdminSettings>, currentCompany: string) => void;
   empreendimento: string;
   setEmpreendimento: (value: string) => void;
   empreendimentos: Empreendimento[];
@@ -29,8 +26,6 @@ interface InputFormProps {
   isEditing: boolean;
   isGenerateDisabled: boolean;
   onOpenLoadPanel: () => void;
-  onOpenDeadlinePanel: () => void;
-  onOpenWebhookPanel: () => void;
   isAtaGenerated: boolean;
   isCollapsed: boolean;
   onToggleCollapse: () => void;
@@ -54,10 +49,9 @@ const FormInput: React.FC<{ label: string; id: string; value: string; onChange: 
 
 
 const InputForm: React.FC<InputFormProps> = (props) => {
-  const { onGenerate, onClear, isLoading, isEditing, vttContent, setVttContent, onOpenLoadPanel, onOpenDeadlinePanel, onOpenWebhookPanel, isAtaGenerated, isCollapsed, onToggleCollapse, isGenerateDisabled } = props;
+  const { onGenerate, onClear, isLoading, isEditing, vttContent, setVttContent, onOpenLoadPanel, isAtaGenerated, isCollapsed, onToggleCollapse, isGenerateDisabled } = props;
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isMammothReady, setIsMammothReady] = useState(false);
-  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
   useEffect(() => {
     if ((window as any).mammoth) setIsMammothReady(true);
@@ -147,22 +141,6 @@ const InputForm: React.FC<InputFormProps> = (props) => {
                     <ChevronLeftIcon className="w-5 h-5 text-slate-500 dark:text-slate-400 group-hover:text-blue-600 dark:group-hover:text-blue-400" />
                 </button>
             )}
-           <button 
-            onClick={onOpenDeadlinePanel} 
-            title="Abrir painel de controle de prazos"
-            className="inline-flex items-center text-sm font-medium text-slate-600 dark:text-slate-300 hover:text-blue-600 dark:hover:text-blue-400"
-          >
-              <CalendarCheckIcon className="w-5 h-5 mr-2" />
-              Prazos
-          </button>
-           <button 
-            onClick={onOpenWebhookPanel} 
-            title="Gerenciar webhooks do Microsoft Teams"
-            className="inline-flex items-center text-sm font-medium text-slate-600 dark:text-slate-300 hover:text-blue-600 dark:hover:text-blue-400"
-          >
-              <SendIcon className="w-5 h-5 mr-2" />
-              Webhooks
-          </button>
           <button 
             onClick={onOpenLoadPanel} 
             disabled={isEditing}
@@ -171,10 +149,6 @@ const InputForm: React.FC<InputFormProps> = (props) => {
           >
               <DownloadCloudIcon className="w-5 h-5 mr-2" />
               Carregar
-          </button>
-          <button onClick={() => setIsSettingsOpen(true)} className="inline-flex items-center text-sm font-medium text-slate-600 dark:text-slate-300 hover:text-blue-600 dark:hover:text-blue-400">
-              <SettingsIcon className="w-5 h-5 mr-2" />
-              Config.
           </button>
         </div>
       </div>
@@ -249,8 +223,6 @@ const InputForm: React.FC<InputFormProps> = (props) => {
           </button>
         </div>
       </div>
-      
-      {isSettingsOpen && <SettingsPanel allProfiles={props.companyProfiles} currentCompanyName={props.currentCompanyName} onSave={props.onSettingsSave} onClose={() => setIsSettingsOpen(false)} />}
     </div>
   );
 };

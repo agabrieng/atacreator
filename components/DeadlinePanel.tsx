@@ -7,8 +7,6 @@ import { sendToTeamsWebhook } from '../services/webhookService';
 import { XIcon, AlertTriangleIcon, CalendarCheckIcon, ChevronRightIcon, ExternalLinkIcon, SparklesIcon, CopyIcon, CheckIcon, UsersIcon, SendIcon } from './icons';
 
 interface DeadlinePanelProps {
-  isOpen: boolean;
-  onClose: () => void;
   onSelectAta: (ata: AtaData) => void;
   adminSettings: AdminSettings | null;
   webhooks: Webhook[];
@@ -360,7 +358,7 @@ const BulletinFilterModal: React.FC<{
 };
 
 
-const DeadlinePanel: React.FC<DeadlinePanelProps> = ({ isOpen, onClose, onSelectAta, adminSettings, webhooks }) => {
+const DeadlinePanel: React.FC<DeadlinePanelProps> = ({ onSelectAta, adminSettings, webhooks }) => {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -394,10 +392,8 @@ const DeadlinePanel: React.FC<DeadlinePanelProps> = ({ isOpen, onClose, onSelect
   }
 
   useEffect(() => {
-    if (isOpen) {
-        fetchAndSetTasks();
-    }
-  }, [isOpen]);
+    fetchAndSetTasks();
+  }, []);
 
   const nonCompletedTasks = useMemo(() => {
     return tasks.filter(task => !task.completed);
@@ -493,8 +489,6 @@ const DeadlinePanel: React.FC<DeadlinePanelProps> = ({ isOpen, onClose, onSelect
         completionDate: convertToDisplayDate(newDate),
     });
   }
-
-  if (!isOpen) return null;
 
   const toggleExpand = (key: string) => {
     setExpandedKeys(prev => ({ ...prev, [key]: !prev[key] }));
@@ -621,11 +615,17 @@ const DeadlinePanel: React.FC<DeadlinePanelProps> = ({ isOpen, onClose, onSelect
 
   return (
     <>
-      <div className="fixed inset-0 bg-black bg-opacity-60 z-40 flex items-center justify-center p-4" onClick={onClose}>
-        <div className="bg-white dark:bg-slate-800 rounded-xl shadow-2xl w-full max-w-4xl flex flex-col h-[90vh]" onClick={(e) => e.stopPropagation()}>
+      <div className="bg-white dark:bg-slate-800 rounded-xl shadow-lg w-full flex flex-col h-full">
           <div className="flex justify-between items-center p-4 border-b border-slate-200 dark:border-slate-700">
             <h2 className="text-xl font-bold text-slate-800 dark:text-slate-100 flex items-center"><CalendarCheckIcon className="w-6 h-6 mr-3 text-blue-600 dark:text-blue-400"/>Painel de Prazos</h2>
             <div className="flex items-center gap-4">
+                 <button
+                    type="button"
+                    onClick={() => setIsBulletinModalOpen(true)}
+                    className="inline-flex items-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-blue-600 text-sm font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 dark:focus:ring-offset-slate-800"
+                >
+                    Gerar Boletim do Dia
+                </button>
                  <label htmlFor="show-completed-toggle" className="flex items-center cursor-pointer">
                     <span className="mr-3 text-sm font-medium text-slate-700 dark:text-slate-300">Ocultar Concluídas</span>
                     <div className="relative">
@@ -634,7 +634,6 @@ const DeadlinePanel: React.FC<DeadlinePanelProps> = ({ isOpen, onClose, onSelect
                         <div className={`dot absolute left-1 top-1 bg-white w-4 h-4 rounded-full transition-transform ${!showCompleted ? 'transform translate-x-full bg-blue-500' : ''}`}></div>
                     </div>
                 </label>
-                <button onClick={onClose} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"><XIcon className="w-6 h-6" /></button>
             </div>
           </div>
 
@@ -718,19 +717,10 @@ const DeadlinePanel: React.FC<DeadlinePanelProps> = ({ isOpen, onClose, onSelect
             )}
           </div>
 
-          <div className="p-4 border-t border-slate-200 dark:border-slate-700 flex justify-between items-center">
+          <div className="p-4 border-t border-slate-200 dark:border-slate-700">
             <p className="text-sm text-slate-500 dark:text-slate-400">Total de {tasks.length} tarefas encontradas.</p>
-            <div className="flex gap-3">
-                 <button type="button" onClick={() => setIsBulletinModalOpen(true)} className="inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-blue-600 text-base font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 dark:focus:ring-offset-slate-800">
-                    Gerar Boletim do Dia
-                </button>
-                <button type="button" onClick={onClose} className="inline-flex justify-center rounded-md border border-slate-300 dark:border-slate-600 shadow-sm px-4 py-2 bg-white dark:bg-slate-700 text-base font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 dark:focus:ring-offset-slate-800">
-                    Fechar
-                </button>
-            </div>
           </div>
         </div>
-      </div>
       <BulletinFilterModal
         isOpen={isBulletinModalOpen}
         onClose={() => setIsBulletinModalOpen(false)}

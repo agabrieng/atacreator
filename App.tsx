@@ -26,7 +26,9 @@ import DeadlinePanel from './components/DeadlinePanel';
 import WebhookPanel from './components/WebhookPanel';
 import Sidebar from './components/Sidebar';
 import Dashboard from './components/Dashboard';
-import { AlertTriangleIcon, EditIcon, CheckIcon, CopyIcon, UploadCloudIcon, DownloadCloudIcon, FilePdfIcon, CheckCircleIcon, XIcon } from './components/icons';
+import SettingsPanel from './components/SettingsPanel';
+import AtaRepositoryView from './components/AtaRepository';
+import { AlertTriangleIcon, EditIcon, CheckIcon, CopyIcon, UploadCloudIcon, DownloadCloudIcon, FilePdfIcon, CheckCircleIcon, XIcon, CalendarCheckIcon, SettingsIcon, SendIcon } from './components/icons';
 
 const DEFAULT_COMPANY_NAME = "Minha Empresa";
 const DEFAULT_SETTINGS: AdminSettings = {
@@ -37,7 +39,7 @@ const DEFAULT_SETTINGS: AdminSettings = {
     propertyInfo: 'AS INFORMAÇÕES DESTE DOCUMENTO SÃO DE PROPRIEDADE DA SUA EMPRESA, SENDO PROIBIDA A UTILIZAÇÃO FORA DA SUA FINALIDADE.',
 };
 
-type View = 'dashboard' | 'ataCreator';
+type View = 'dashboard' | 'ataCreator' | 'ataRepository' | 'deadlinePanel' | 'settings';
 
 const ActionButton: React.FC<{
     onClick?: () => void;
@@ -95,9 +97,13 @@ const Toast: React.FC<ToastProps> = ({ message, type, onClose }) => {
 };
 
 
-const AtaCreatorView: React.FC = () => {
-  const [companyProfiles, setCompanyProfiles] = useState<Record<string, AdminSettings>>({});
-  const [currentCompanyName, setCurrentCompanyName] = useState<string>('');
+const AtaCreatorView: React.FC<{
+    initialAta?: AtaData | null;
+    onAtaViewed?: () => void;
+    companyProfiles: Record<string, AdminSettings>;
+    currentCompanyName: string;
+    setToast: (toast: { message: string; type: 'success' | 'error' } | null) => void;
+}> = ({ initialAta, onAtaViewed, companyProfiles, currentCompanyName, setToast }) => {
   
   const adminSettings = companyProfiles[currentCompanyName] || null;
 
@@ -144,42 +150,7 @@ const AtaCreatorView: React.FC = () => {
   // State for collapsible form
   const [isFormCollapsed, setIsFormCollapsed] = useState(false);
 
-  // State for Deadline Panel
-  const [isDeadlinePanelOpen, setIsDeadlinePanelOpen] = useState(false);
-  
-  // State for Webhooks
-  const [webhooks, setWebhooks] = useState<Webhook[]>([]);
-  const [isWebhookPanelOpen, setIsWebhookPanelOpen] = useState(false);
-
-  // State for Toast notifications
-  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
-
-
   useEffect(() => {
-    // Load company profiles from localStorage
-    try {
-      const savedProfilesStr = localStorage.getItem('ata-company-profiles');
-      let profiles: Record<string, AdminSettings> = {};
-      if (savedProfilesStr) {
-        profiles = JSON.parse(savedProfilesStr);
-      }
-      if (Object.keys(profiles).length === 0) {
-        profiles[DEFAULT_COMPANY_NAME] = DEFAULT_SETTINGS;
-      }
-      setCompanyProfiles(profiles);
-
-      const savedCurrentCompany = localStorage.getItem('ata-current-company-name');
-      if (savedCurrentCompany && profiles[savedCurrentCompany]) {
-        setCurrentCompanyName(savedCurrentCompany);
-      } else {
-        setCurrentCompanyName(Object.keys(profiles)[0]);
-      }
-    } catch (e) {
-      console.error("Failed to load settings from localStorage", e);
-      setCompanyProfiles({ [DEFAULT_COMPANY_NAME]: DEFAULT_SETTINGS });
-      setCurrentCompanyName(DEFAULT_COMPANY_NAME);
-    }
-    
     // Load empreendimentos from Firebase
     const fetchEmpreendimentos = async () => {
         try {
@@ -194,19 +165,7 @@ const AtaCreatorView: React.FC = () => {
         }
     };
     
-    // Load webhooks from Firebase
-    const fetchWebhooks = async () => {
-        try {
-            const loadedWebhooks = await getWebhooks();
-            setWebhooks(loadedWebhooks);
-        } catch (error: any) {
-            console.error("Failed to load webhooks from Firebase", error);
-            setToast({ message: `Falha ao carregar webhooks: ${error.message}`, type: 'error' });
-        }
-    };
-    
     fetchEmpreendimentos();
-    fetchWebhooks();
   }, []);
   
     useEffect(() => {
@@ -249,56 +208,32 @@ const AtaCreatorView: React.FC = () => {
         }
     }, [empreendimento, empreendimentos]);
     
+    const handleSelectSavedAta = useCallback((selectedAta: AtaData) => {
+      setAta(selectedAta);
+      setOriginalLoadedAta(selectedAta); // Keep a copy for change detection
+      setEmpreendimento(selectedAta.empreendimento || '');
+      setArea(selectedAta.area || '');
+      setTitulo(selectedAta.titulo || '');
+      setContrato(selectedAta.contrato || '');
+      setAssunto(selectedAta.assunto || '');
+      setLocal(selectedAta.local || '');
+      setVttContent('');
+      setShowLoadPanel(false);
+      setIsEditing(true); // Abrir em modo de edição
+      setIsFormCollapsed(true);
+    }, []);
+    
+    // Handle initial ata passed via props
     useEffect(() => {
-        if (toast) {
-            const timer = setTimeout(() => setToast(null), 4000);
-            return () => clearTimeout(timer);
+        if (initialAta) {
+            handleSelectSavedAta(initialAta);
+            if (onAtaViewed) {
+                onAtaViewed();
+            }
         }
-    }, [toast]);
+    }, [initialAta, onAtaViewed, handleSelectSavedAta]);
 
-  const handleSettingsSave = useCallback((profiles: Record<string, AdminSettings>, currentCompany: string) => {
-    setCompanyProfiles(profiles);
-    setCurrentCompanyName(currentCompany);
-    localStorage.setItem('ata-company-profiles', JSON.stringify(profiles));
-    localStorage.setItem('ata-current-company-name', currentCompany);
-  }, []);
   
-  // --- Webhook Handlers ---
-  const handleAddWebhook = async (name: string, url: string) => {
-    try {
-        const newId = await addWebhook(name, url);
-        const newWebhook = { id: newId, name, url };
-        setWebhooks(prev => [...prev, newWebhook].sort((a, b) => a.name.localeCompare(b.name)));
-        setToast({ message: 'Webhook adicionado com sucesso!', type: 'success' });
-    } catch (error: any) {
-        console.error("Failed to add webhook:", error);
-        setToast({ message: `Falha ao adicionar webhook: ${error.message}`, type: 'error' });
-    }
-  };
-  
-  const handleUpdateWebhook = async (id: string, name: string, url: string) => {
-    try {
-        await updateWebhook(id, name, url);
-        setWebhooks(prev => prev.map(w => w.id === id ? { ...w, name, url } : w).sort((a, b) => a.name.localeCompare(b.name)));
-        setToast({ message: 'Webhook atualizado com sucesso!', type: 'success' });
-    } catch (error: any) {
-        console.error("Failed to update webhook:", error);
-        setToast({ message: `Falha ao atualizar webhook: ${error.message}`, type: 'error' });
-    }
-  };
-
-  const handleDeleteWebhook = async (id: string) => {
-    try {
-        await deleteWebhook(id);
-        setWebhooks(prev => prev.filter(w => w.id !== id));
-        setToast({ message: 'Webhook excluído com sucesso!', type: 'success' });
-    } catch (error: any) {
-        console.error("Failed to delete webhook:", error);
-        setToast({ message: `Falha ao excluir webhook: ${error.message}`, type: 'error' });
-    }
-  };
-
-
   // --- Project Management Handlers ---
   const handleAddProject = async (name: string, contrato: string) => {
     try {
@@ -487,7 +422,7 @@ const AtaCreatorView: React.FC = () => {
     } finally {
       setIsSaving(false);
     }
-  }, [ata, originalLoadedAta]);
+  }, [ata, originalLoadedAta, setToast]);
   
   const handleOpenLoadPanel = useCallback(async () => {
     setShowLoadPanel(true);
@@ -504,38 +439,6 @@ const AtaCreatorView: React.FC = () => {
     } finally {
         setIsSavedAtasLoading(false);
     }
-  }, []);
-
-  const handleSelectSavedAta = useCallback((selectedAta: AtaData) => {
-    setAta(selectedAta);
-    setOriginalLoadedAta(selectedAta); // Keep a copy for change detection
-    setEmpreendimento(selectedAta.empreendimento || '');
-    setArea(selectedAta.area || '');
-    setTitulo(selectedAta.titulo || '');
-    setContrato(selectedAta.contrato || '');
-    setAssunto(selectedAta.assunto || '');
-    setLocal(selectedAta.local || '');
-    setVttContent('');
-    setShowLoadPanel(false);
-    setIsDeadlinePanelOpen(false); // Close deadline panel if open
-    setIsEditing(true); // Abrir em modo de edição
-    setIsFormCollapsed(true);
-  }, []);
-
-  const handleViewAtaFromDeadlinePanel = useCallback((selectedAta: AtaData) => {
-    setAta(selectedAta);
-    setOriginalLoadedAta(selectedAta);
-    setEmpreendimento(selectedAta.empreendimento || '');
-    setArea(selectedAta.area || '');
-    setTitulo(selectedAta.titulo || '');
-    setContrato(selectedAta.contrato || '');
-    setAssunto(selectedAta.assunto || '');
-    setLocal(selectedAta.local || '');
-    setVttContent('');
-    setShowLoadPanel(false);
-    setIsDeadlinePanelOpen(false); 
-    setIsEditing(false); // Open in read-only mode
-    setIsFormCollapsed(true);
   }, []);
 
   const handleDeleteClick = (ata: AtaData) => {
@@ -611,9 +514,6 @@ const AtaCreatorView: React.FC = () => {
         <div className={`grid grid-cols-1 ${ata ? `lg:grid lg:grid-cols-[${isFormCollapsed ? 'auto_1fr' : 'minmax(450px,_5fr)_7fr'}]` : 'lg:grid-cols-2'} gap-8 items-start`}>
             <div className="transition-all duration-300 ease-in-out">
                 <InputForm
-                    companyProfiles={companyProfiles}
-                    currentCompanyName={currentCompanyName}
-                    onSettingsSave={handleSettingsSave}
                     empreendimento={empreendimento} setEmpreendimento={setEmpreendimento}
                     empreendimentos={empreendimentos}
                     isProjectsLoading={isProjectsLoading}
@@ -629,8 +529,6 @@ const AtaCreatorView: React.FC = () => {
                     isEditing={isEditing}
                     isGenerateDisabled={isLoading || isEditing || !empreendimento.trim() || !area.trim() || !titulo.trim() || !assunto.trim() || !local.trim() || !vttContent.trim()}
                     onOpenLoadPanel={handleOpenLoadPanel}
-                    onOpenDeadlinePanel={() => setIsDeadlinePanelOpen(true)}
-                    onOpenWebhookPanel={() => setIsWebhookPanelOpen(true)}
                     isAtaGenerated={!!ata}
                     isCollapsed={isFormCollapsed && !!ata}
                     onToggleCollapse={() => setIsFormCollapsed(!isFormCollapsed)}
@@ -701,7 +599,6 @@ const AtaCreatorView: React.FC = () => {
           </div>
         </div>
       </main>
-      {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
       <SavedAtasPanel
         isOpen={showLoadPanel}
         isLoading={isSavedAtasLoading}
@@ -718,21 +615,6 @@ const AtaCreatorView: React.FC = () => {
         onAdd={handleAddProject}
         onUpdate={handleUpdateProject}
         onDelete={handleDeleteProject}
-      />
-      <DeadlinePanel
-        isOpen={isDeadlinePanelOpen}
-        onClose={() => setIsDeadlinePanelOpen(false)}
-        onSelectAta={handleViewAtaFromDeadlinePanel}
-        adminSettings={adminSettings}
-        webhooks={webhooks}
-      />
-      <WebhookPanel
-        isOpen={isWebhookPanelOpen}
-        onClose={() => setIsWebhookPanelOpen(false)}
-        webhooks={webhooks}
-        onAdd={handleAddWebhook}
-        onUpdate={handleUpdateWebhook}
-        onDelete={handleDeleteWebhook}
       />
       <ConfirmationDialog
         isOpen={showClearConfirmation}
@@ -792,6 +674,95 @@ const AtaCreatorView: React.FC = () => {
   );
 };
 
+const DeadlineView: React.FC<{ 
+    onNavigateToAta: (ata: AtaData) => void;
+    adminSettings: AdminSettings | null;
+    webhooks: Webhook[];
+}> = ({ onNavigateToAta, adminSettings, webhooks }) => {
+    return (
+        <main className="container mx-auto p-4 md:p-8 h-full">
+            <DeadlinePanel
+                onSelectAta={onNavigateToAta}
+                adminSettings={adminSettings}
+                webhooks={webhooks}
+            />
+        </main>
+    );
+};
+
+const SettingsView: React.FC<{
+    allProfiles: Record<string, AdminSettings>;
+    currentCompanyName: string;
+    onSave: (profiles: Record<string, AdminSettings>, currentCompany: string) => void;
+    setToast: (toast: { message: string; type: 'success' | 'error' } | null) => void;
+    webhooks: Webhook[];
+    onAddWebhook: (name: string, url: string) => Promise<void>;
+    onUpdateWebhook: (id: string, newName: string, newUrl: string) => Promise<void>;
+    onDeleteWebhook: (id: string) => Promise<void>;
+}> = ({ allProfiles, currentCompanyName, onSave, setToast, webhooks, onAddWebhook, onUpdateWebhook, onDeleteWebhook }) => {
+    const [activeTab, setActiveTab] = useState<'profiles' | 'webhooks'>('profiles');
+
+    const handleSaveWithToast = (profiles: Record<string, AdminSettings>, currentCompany: string) => {
+        onSave(profiles, currentCompany);
+        setToast({ message: 'Configurações salvas com sucesso!', type: 'success' });
+    };
+    
+    return (
+        <main className="container mx-auto p-4 md:p-8">
+             <header className="mb-8">
+                <h1 className="text-3xl font-bold text-slate-800 dark:text-slate-100 flex items-center">
+                    <SettingsIcon className="w-8 h-8 mr-3 text-slate-500" />
+                    Configurações
+                </h1>
+                <p className="text-slate-500 dark:text-slate-400">Gerencie os perfis da sua empresa, integrações e outras configurações gerais.</p>
+            </header>
+            
+            <div className="border-b border-slate-200 dark:border-slate-700 mb-6">
+                <nav className="-mb-px flex space-x-6" aria-label="Tabs">
+                    <button
+                        onClick={() => setActiveTab('profiles')}
+                        className={`whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm ${
+                            activeTab === 'profiles'
+                            ? 'border-blue-500 text-blue-600 dark:text-blue-400'
+                            : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300 dark:text-slate-400 dark:hover:text-slate-300 dark:hover:border-slate-600'
+                        }`}
+                    >
+                        Perfis de Empresa
+                    </button>
+                    <button
+                        onClick={() => setActiveTab('webhooks')}
+                        className={`whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm ${
+                            activeTab === 'webhooks'
+                            ? 'border-blue-500 text-blue-600 dark:text-blue-400'
+                            : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300 dark:text-slate-400 dark:hover:text-slate-300 dark:hover:border-slate-600'
+                        }`}
+                    >
+                        Webhooks do Teams
+                    </button>
+                </nav>
+            </div>
+
+            <div className="max-w-2xl mx-auto">
+                 {activeTab === 'profiles' && (
+                    <SettingsPanel 
+                        allProfiles={allProfiles} 
+                        currentCompanyName={currentCompanyName} 
+                        onSave={handleSaveWithToast}
+                    />
+                 )}
+                 {activeTab === 'webhooks' && (
+                    <WebhookPanel
+                        webhooks={webhooks}
+                        onAdd={onAddWebhook}
+                        onUpdate={onUpdateWebhook}
+                        onDelete={onDeleteWebhook}
+                    />
+                 )}
+            </div>
+        </main>
+    );
+};
+
 
 const App: React.FC = () => {
   const [currentView, setCurrentView] = useState<View>('dashboard');
@@ -804,6 +775,102 @@ const App: React.FC = () => {
     }
   });
 
+  const [ataToView, setAtaToView] = useState<AtaData | null>(null);
+  
+  // State lifted from AtaCreatorView
+  const [companyProfiles, setCompanyProfiles] = useState<Record<string, AdminSettings>>({});
+  const [currentCompanyName, setCurrentCompanyName] = useState<string>('');
+  const [webhooks, setWebhooks] = useState<Webhook[]>([]);
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+
+  useEffect(() => {
+    // Load company profiles from localStorage
+    try {
+      const savedProfilesStr = localStorage.getItem('ata-company-profiles');
+      let profiles: Record<string, AdminSettings> = {};
+      if (savedProfilesStr) {
+        profiles = JSON.parse(savedProfilesStr);
+      }
+      if (Object.keys(profiles).length === 0) {
+        profiles[DEFAULT_COMPANY_NAME] = DEFAULT_SETTINGS;
+      }
+      setCompanyProfiles(profiles);
+
+      const savedCurrentCompany = localStorage.getItem('ata-current-company-name');
+      if (savedCurrentCompany && profiles[savedCurrentCompany]) {
+        setCurrentCompanyName(savedCurrentCompany);
+      } else {
+        setCurrentCompanyName(Object.keys(profiles)[0]);
+      }
+    } catch (e) {
+      console.error("Failed to load settings from localStorage", e);
+      setCompanyProfiles({ [DEFAULT_COMPANY_NAME]: DEFAULT_SETTINGS });
+      setCurrentCompanyName(DEFAULT_COMPANY_NAME);
+    }
+    
+     // Load webhooks from Firebase
+    const fetchWebhooks = async () => {
+        try {
+            const loadedWebhooks = await getWebhooks();
+            setWebhooks(loadedWebhooks);
+        } catch (error: any) {
+            console.error("Failed to load webhooks from Firebase", error);
+            setToast({ message: `Falha ao carregar webhooks: ${error.message}`, type: 'error' });
+        }
+    };
+    
+    fetchWebhooks();
+  }, []);
+  
+  useEffect(() => {
+    if (toast) {
+        const timer = setTimeout(() => setToast(null), 4000);
+        return () => clearTimeout(timer);
+    }
+  }, [toast]);
+
+  const handleSettingsSave = useCallback((profiles: Record<string, AdminSettings>, currentCompany: string) => {
+    setCompanyProfiles(profiles);
+    setCurrentCompanyName(currentCompany);
+    localStorage.setItem('ata-company-profiles', JSON.stringify(profiles));
+    localStorage.setItem('ata-current-company-name', currentCompany);
+  }, []);
+  
+  // --- Webhook Handlers ---
+  const handleAddWebhook = async (name: string, url: string) => {
+    try {
+        const newId = await addWebhook(name, url);
+        const newWebhook = { id: newId, name, url };
+        setWebhooks(prev => [...prev, newWebhook].sort((a, b) => a.name.localeCompare(b.name)));
+        setToast({ message: 'Webhook adicionado com sucesso!', type: 'success' });
+    } catch (error: any) {
+        console.error("Failed to add webhook:", error);
+        setToast({ message: `Falha ao adicionar webhook: ${error.message}`, type: 'error' });
+    }
+  };
+  
+  const handleUpdateWebhook = async (id: string, name: string, url: string) => {
+    try {
+        await updateWebhook(id, name, url);
+        setWebhooks(prev => prev.map(w => w.id === id ? { ...w, name, url } : w).sort((a, b) => a.name.localeCompare(b.name)));
+        setToast({ message: 'Webhook atualizado com sucesso!', type: 'success' });
+    } catch (error: any) {
+        console.error("Failed to update webhook:", error);
+        setToast({ message: `Falha ao atualizar webhook: ${error.message}`, type: 'error' });
+    }
+  };
+
+  const handleDeleteWebhook = async (id: string) => {
+    try {
+        await deleteWebhook(id);
+        setWebhooks(prev => prev.filter(w => w.id !== id));
+        setToast({ message: 'Webhook excluído com sucesso!', type: 'success' });
+    } catch (error: any) {
+        console.error("Failed to delete webhook:", error);
+        setToast({ message: `Falha ao excluir webhook: ${error.message}`, type: 'error' });
+    }
+  };
+
   const toggleSidebar = () => {
     setIsSidebarCollapsed(prevState => {
       const newState = !prevState;
@@ -815,6 +882,17 @@ const App: React.FC = () => {
       return newState;
     });
   };
+  
+  const handleNavigateToAta = (ata: AtaData) => {
+    setAtaToView(ata);
+    setCurrentView('ataCreator');
+  };
+
+  const handleAtaViewed = () => {
+    setAtaToView(null);
+  }
+  
+  const adminSettings = companyProfiles[currentCompanyName] || null;
 
   return (
     <div className="min-h-screen bg-slate-100 dark:bg-slate-900 text-slate-800 dark:text-slate-200 font-sans flex">
@@ -825,8 +903,21 @@ const App: React.FC = () => {
         toggleCollapse={toggleSidebar}
       />
       <div className={`flex-1 w-full transition-all duration-300 ease-in-out ${isSidebarCollapsed ? 'pl-20' : 'pl-64'}`}>
+        {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
         {currentView === 'dashboard' && <Dashboard />}
-        {currentView === 'ataCreator' && <AtaCreatorView />}
+        {currentView === 'ataCreator' && <AtaCreatorView initialAta={ataToView} onAtaViewed={handleAtaViewed} companyProfiles={companyProfiles} currentCompanyName={currentCompanyName} setToast={setToast} />}
+        {currentView === 'ataRepository' && <AtaRepositoryView onNavigateToAta={handleNavigateToAta} />}
+        {currentView === 'deadlinePanel' && <DeadlineView onNavigateToAta={handleNavigateToAta} adminSettings={adminSettings} webhooks={webhooks} />}
+        {currentView === 'settings' && <SettingsView 
+            allProfiles={companyProfiles} 
+            currentCompanyName={currentCompanyName} 
+            onSave={handleSettingsSave} 
+            setToast={setToast}
+            webhooks={webhooks}
+            onAddWebhook={handleAddWebhook}
+            onUpdateWebhook={handleUpdateWebhook}
+            onDeleteWebhook={handleDeleteWebhook}
+        />}
       </div>
     </div>
   );

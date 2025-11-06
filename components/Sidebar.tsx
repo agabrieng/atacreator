@@ -1,7 +1,7 @@
 import React from 'react';
-import { GridIcon, FileTextIcon, ChevronLeftIcon, ChevronRightIcon } from './icons';
+import { GridIcon, FileTextIcon, ChevronLeftIcon, ChevronRightIcon, CalendarCheckIcon, SettingsIcon, ArchiveIcon } from './icons';
 
-type View = 'dashboard' | 'ataCreator';
+type View = 'dashboard' | 'ataCreator' | 'deadlinePanel' | 'settings' | 'ataRepository';
 
 interface SidebarProps {
   currentView: View;
@@ -58,6 +58,27 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, setCurrentView, isCollap
           label="Gerador de Atas"
           isActive={currentView === 'ataCreator'}
           onClick={() => setCurrentView('ataCreator')}
+          isCollapsed={isCollapsed}
+        />
+        <NavLink
+          icon={ArchiveIcon}
+          label="Repositório de Atas"
+          isActive={currentView === 'ataRepository'}
+          onClick={() => setCurrentView('ataRepository')}
+          isCollapsed={isCollapsed}
+        />
+        <NavLink
+          icon={CalendarCheckIcon}
+          label="Painel de Prazos"
+          isActive={currentView === 'deadlinePanel'}
+          onClick={() => setCurrentView('deadlinePanel')}
+          isCollapsed={isCollapsed}
+        />
+        <NavLink
+          icon={SettingsIcon}
+          label="Configurações"
+          isActive={currentView === 'settings'}
+          onClick={() => setCurrentView('settings')}
           isCollapsed={isCollapsed}
         />
       </nav>
