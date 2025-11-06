@@ -251,7 +251,7 @@ const TaskEvolutionChart: React.FC<{ tasks: Task[] }> = React.memo(({ tasks }) =
             </h3>
             {projects.length > 0 ? (
                 <>
-                <div className="relative h-72" ref={containerRef}>
+                <div className="relative h-60" ref={containerRef}>
                     <svg width="100%" height="100%" viewBox="0 0 400 300" preserveAspectRatio="xMidYMid meet">
                         <g className="grid">
                            {Array.from({length: 6}).map((_, i) => (
@@ -397,14 +397,15 @@ const Dashboard: React.FC = () => {
             <StatCard title="Empreendimentos Ativos" value={stats.activeEmpreendimentos} icon={CalendarCheckIcon} color="bg-green-500" />
         </div>
         
-        {/* Charts Layout - Updated to match the new screenshot */}
-        <div className="space-y-6">
-            <TaskEvolutionChart tasks={tasks} />
-            
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
-                <TaskStatusPieChart tasks={tasks} />
+        {/* Charts Layout */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+            <div className="lg:col-span-2">
+                <TaskEvolutionChart tasks={tasks} />
+            </div>
+            <UpcomingTasksList tasks={upcomingTasks} />
+            <TaskStatusPieChart tasks={tasks} />
+            <div className="lg:col-span-2">
                 <TasksPerProjectChart tasks={tasks} />
-                <UpcomingTasksList tasks={upcomingTasks} />
             </div>
         </div>
     </div>
