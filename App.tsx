@@ -1,4 +1,5 @@
-import React, { useState, useCallback, useEffect } from 'react';
+
+import React, { useState, useCallback, useEffect, useMemo } from 'react';
 import type { AtaData, AdminSettings, Participant, PautaItem, Empreendimento, Webhook } from './types';
 import { generateAtaData } from './services/geminiService';
 import { 
@@ -129,6 +130,7 @@ const AtaCreatorView: React.FC<{
   const [copied, setCopied] = useState(false);
   const [isExportReady, setIsExportReady] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [saveSuccess, setSaveSuccess] = useState(false);
 
   // State for Projects (Empreendimentos)
   const [empreendimentos, setEmpreendimentos] = useState<Empreendimento[]>([]);
@@ -137,6 +139,16 @@ const AtaCreatorView: React.FC<{
   
   // State for collapsible form
   const [isFormCollapsed, setIsFormCollapsed] = useState(false);
+
+  const hasChanges = useMemo(() => {
+    if (!ata) return false;
+    // A new, unsaved ata (no id) is considered "changed".
+    if (!ata.id) return true;
+    // If there's no original state to compare to, but it has an id, something is weird, but we assume it's changed.
+    if (!originalLoadedAta) return true;
+    // Compare current ata with the last saved/loaded state.
+    return JSON.stringify(ata) !== JSON.stringify(originalLoadedAta);
+  }, [ata, originalLoadedAta]);
 
   useEffect(() => {
     // Load empreendimentos from Firebase
@@ -399,17 +411,17 @@ const AtaCreatorView: React.FC<{
       const docId = await saveAtaToFirebase(ata);
       const savedAta = { ...ata, id: docId };
       setAta(savedAta);
-      if (originalLoadedAta) {
-          setOriginalLoadedAta(savedAta);
-      }
+      setOriginalLoadedAta(savedAta); // Always update original state after a save
       setToast({ message: 'Ata salva com sucesso na nuvem!', type: 'success' });
+      setSaveSuccess(true);
+      setTimeout(() => setSaveSuccess(false), 2500);
     } catch (error: any) {
       console.error("Erro ao salvar a ata no Firebase:", error);
       setToast({ message: `Erro ao salvar a ata: ${error.message}`, type: 'error' });
     } finally {
       setIsSaving(false);
     }
-  }, [ata, originalLoadedAta, setToast]);
+  }, [ata, setToast]);
   
   const handleCopy = useCallback(() => {
       if (!ata) return;
@@ -514,18 +526,23 @@ const AtaCreatorView: React.FC<{
                     </ActionButton>
                     <ActionButton
                         onClick={handleSave}
-                        disabled={isEditing || isSaving}
-                        title={isEditing ? "Conclua a edição para poder salvar" : "Salvar na nuvem"}
-                        className="bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-200 border border-slate-300 dark:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-600 focus:ring-blue-500"
+                        disabled={!hasChanges || isSaving}
+                        title={saveSuccess ? "Ata salva com sucesso!" : !hasChanges ? "Nenhuma alteração para salvar" : isSaving ? "Salvando..." : "Salvar na nuvem"}
+                        className={saveSuccess
+                            ? 'bg-green-600 text-white hover:bg-green-700 focus:ring-green-500'
+                            : 'bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-200 border border-slate-300 dark:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-600 focus:ring-blue-500'
+                        }
                     >
                         {isSaving ? (
                             <div className="w-5 h-5 border-2 border-current border-t-transparent rounded-full animate-spin" role="status">
                                 <span className="sr-only">Salvando...</span>
                             </div>
+                        ) : saveSuccess ? (
+                            <CheckCircleIcon className="w-5 h-5" />
                         ) : (
                             <UploadCloudIcon className="w-5 h-5" />
                         )}
-                        <span>{isSaving ? 'Salvando...' : 'Salvar na Nuvem'}</span>
+                        <span>{isSaving ? 'Salvando...' : saveSuccess ? 'Salvo!' : 'Salvar na Nuvem'}</span>
                     </ActionButton>
                     <div className="flex-grow"></div>
                     <ActionButton
