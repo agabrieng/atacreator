@@ -103,3 +103,31 @@ export interface Webhook {
   name: string;
   url: string;
 }
+
+// --- Types for Project Control ---
+export type ProjectStatus = 'pending' | 'in-progress' | 'completed' | 'overdue';
+
+export type Disciplina = 'Civil' | 'Eletromecânico' | 'Elétrica' | 'Telecom' | 'Arquitetônico' | 'Outra';
+
+export const disciplinas: Disciplina[] = ['Civil', 'Eletromecânico', 'Elétrica', 'Telecom', 'Arquitetônico', 'Outra'];
+
+export interface Projetista {
+  id: string;
+  name: string;
+  logo: string | null; // base64 string
+}
+
+export interface Projeto {
+  id: string;
+  projetistaId: string;
+  name: string;
+  description: string;
+  deadline: string; // Stored as YYYY-MM-DD
+  status: ProjectStatus;
+  // New fields
+  contrato: string;
+  empreendimento: string;
+  disciplina: Disciplina;
+  taxonomia: string;
+  dataEntrega?: string | null; // Stored as YYYY-MM-DD
+}

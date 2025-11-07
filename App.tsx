@@ -1,6 +1,7 @@
 
+
 import React, { useState, useCallback, useEffect, useMemo } from 'react';
-import type { AtaData, AdminSettings, Participant, PautaItem, Empreendimento, Webhook } from './types';
+import type { AtaData, AdminSettings, Participant, PautaItem, Empreendimento, Webhook, Projetista } from './types';
 import { generateAtaData } from './services/geminiService';
 import { 
     saveAtaToFirebase, 
@@ -11,7 +12,11 @@ import {
     getWebhooks,
     addWebhook,
     updateWebhook,
-    deleteWebhook
+    deleteWebhook,
+    getProjetistas,
+    addProjetista,
+    updateProjetista,
+    deleteProjetista
 } from './services/firebaseService';
 import { exportToPdf } from './services/exportService';
 import Header from './components/Header';
@@ -27,7 +32,10 @@ import Sidebar from './components/Sidebar';
 import Dashboard from './components/Dashboard';
 import SettingsPanel from './components/SettingsPanel';
 import AtaRepositoryView from './components/AtaRepository';
-import { AlertTriangleIcon, EditIcon, CheckIcon, CopyIcon, UploadCloudIcon, DownloadCloudIcon, FilePdfIcon, CheckCircleIcon, XIcon, CalendarCheckIcon, SettingsIcon, SendIcon } from './components/icons';
+import ProjectControlView from './components/ProjectControlView';
+import ProjectDashboardView from './components/ProjectDashboardView';
+import ProjetistasPanel from './components/ProjetistasPanel';
+import { AlertTriangleIcon, EditIcon, CheckIcon, CopyIcon, UploadCloudIcon, DownloadCloudIcon, FilePdfIcon, CheckCircleIcon, XIcon, CalendarCheckIcon, SettingsIcon, SendIcon, BriefcaseIcon } from './components/icons';
 
 const DEFAULT_COMPANY_NAME = "Minha Empresa";
 const DEFAULT_SETTINGS: AdminSettings = {
@@ -38,7 +46,7 @@ const DEFAULT_SETTINGS: AdminSettings = {
     propertyInfo: 'AS INFORMAÇÕES DESTE DOCUMENTO SÃO DE PROPRIEDADE DA SUA EMPRESA, SENDO PROIBIDA A UTILIZAÇÃO FORA DA SUA FINALIDADE.',
 };
 
-type View = 'dashboard' | 'ataCreator' | 'ataRepository' | 'deadlinePanel' | 'settings';
+type View = 'dashboard' | 'ataCreator' | 'ataRepository' | 'deadlinePanel' | 'settings' | 'projectControl' | 'projectDashboard';
 
 const ActionButton: React.FC<{
     onClick?: () => void;
@@ -640,8 +648,12 @@ const SettingsView: React.FC<{
     onAddWebhook: (name: string, url: string) => Promise<void>;
     onUpdateWebhook: (id: string, newName: string, newUrl: string) => Promise<void>;
     onDeleteWebhook: (id: string) => Promise<void>;
-}> = ({ allProfiles, currentCompanyName, onSave, setToast, webhooks, onAddWebhook, onUpdateWebhook, onDeleteWebhook }) => {
-    const [activeTab, setActiveTab] = useState<'profiles' | 'webhooks'>('profiles');
+    projetistas: Projetista[];
+    onAddProjetista: (name: string, logo: string | null) => Promise<void>;
+    onUpdateProjetista: (id: string, name: string, logo: string | null) => Promise<void>;
+    onDeleteProjetista: (id: string) => Promise<void>;
+}> = ({ allProfiles, currentCompanyName, onSave, setToast, webhooks, onAddWebhook, onUpdateWebhook, onDeleteWebhook, projetistas, onAddProjetista, onUpdateProjetista, onDeleteProjetista }) => {
+    const [activeTab, setActiveTab] = useState<'profiles' | 'webhooks' | 'projetistas'>('profiles');
 
     const handleSaveWithToast = (profiles: Record<string, AdminSettings>, currentCompany: string) => {
         onSave(profiles, currentCompany);
@@ -671,6 +683,16 @@ const SettingsView: React.FC<{
                         Perfis de Empresa
                     </button>
                     <button
+                        onClick={() => setActiveTab('projetistas')}
+                        className={`whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm ${
+                            activeTab === 'projetistas'
+                            ? 'border-blue-500 text-blue-600 dark:text-blue-400'
+                            : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300 dark:text-slate-400 dark:hover:text-slate-300 dark:hover:border-slate-600'
+                        }`}
+                    >
+                        Empresas Projetistas
+                    </button>
+                    <button
                         onClick={() => setActiveTab('webhooks')}
                         className={`whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm ${
                             activeTab === 'webhooks'
@@ -683,12 +705,20 @@ const SettingsView: React.FC<{
                 </nav>
             </div>
 
-            <div className="max-w-2xl mx-auto">
+            <div className="max-w-4xl mx-auto">
                  {activeTab === 'profiles' && (
                     <SettingsPanel 
                         allProfiles={allProfiles} 
                         currentCompanyName={currentCompanyName} 
                         onSave={handleSaveWithToast}
+                    />
+                 )}
+                 {activeTab === 'projetistas' && (
+                    <ProjetistasPanel
+                        projetistas={projetistas}
+                        onAdd={onAddProjetista}
+                        onUpdate={onUpdateProjetista}
+                        onDelete={onDeleteProjetista}
                     />
                  )}
                  {activeTab === 'webhooks' && (
@@ -722,6 +752,7 @@ const App: React.FC = () => {
   const [companyProfiles, setCompanyProfiles] = useState<Record<string, AdminSettings>>({});
   const [currentCompanyName, setCurrentCompanyName] = useState<string>('');
   const [webhooks, setWebhooks] = useState<Webhook[]>([]);
+  const [projetistas, setProjetistas] = useState<Projetista[]>([]);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
   useEffect(() => {
@@ -749,18 +780,21 @@ const App: React.FC = () => {
       setCurrentCompanyName(DEFAULT_COMPANY_NAME);
     }
     
-     // Load webhooks from Firebase
-    const fetchWebhooks = async () => {
+    const fetchData = async () => {
         try {
-            const loadedWebhooks = await getWebhooks();
+            const [loadedWebhooks, loadedProjetistas] = await Promise.all([
+                getWebhooks(),
+                getProjetistas()
+            ]);
             setWebhooks(loadedWebhooks);
+            setProjetistas(loadedProjetistas);
         } catch (error: any) {
-            console.error("Failed to load webhooks from Firebase", error);
-            setToast({ message: `Falha ao carregar webhooks: ${error.message}`, type: 'error' });
+            console.error("Failed to load initial data from Firebase", error);
+            setToast({ message: `Falha ao carregar dados iniciais: ${error.message}`, type: 'error' });
         }
     };
     
-    fetchWebhooks();
+    fetchData();
   }, []);
   
   useEffect(() => {
@@ -812,6 +846,38 @@ const App: React.FC = () => {
     }
   };
 
+  // --- Projetista Handlers ---
+    const handleAddProjetista = async (name: string, logo: string | null) => {
+        try {
+            const newId = await addProjetista(name, logo);
+            const newProjetista = { id: newId, name, logo };
+            setProjetistas(prev => [...prev, newProjetista].sort((a, b) => a.name.localeCompare(b.name)));
+            setToast({ message: 'Empresa adicionada com sucesso!', type: 'success' });
+        } catch (err: any) {
+            setToast({ message: `Erro ao adicionar empresa: ${err.message}`, type: 'error' });
+        }
+    };
+    
+    const handleUpdateProjetista = async (id: string, name: string, logo: string | null) => {
+        try {
+            await updateProjetista(id, name, logo);
+            setProjetistas(prev => prev.map(p => p.id === id ? { ...p, name, logo } : p).sort((a, b) => a.name.localeCompare(b.name)));
+            setToast({ message: 'Empresa atualizada com sucesso!', type: 'success' });
+        } catch (err: any) {
+            setToast({ message: `Erro ao atualizar empresa: ${err.message}`, type: 'error' });
+        }
+    };
+
+    const handleDeleteProjetista = async (id: string) => {
+        try {
+            await deleteProjetista(id);
+            setProjetistas(prev => prev.filter(p => p.id !== id));
+            setToast({ message: 'Empresa e projetos associados excluídos com sucesso!', type: 'success' });
+        } catch (err: any) {
+             setToast({ message: `Erro ao excluir empresa: ${err.message}`, type: 'error' });
+        }
+    };
+
   const toggleSidebar = () => {
     setIsSidebarCollapsed(prevState => {
       const newState = !prevState;
@@ -849,6 +915,8 @@ const App: React.FC = () => {
         {currentView === 'ataCreator' && <AtaCreatorView initialAta={ataToView} onAtaViewed={handleAtaViewed} companyProfiles={companyProfiles} currentCompanyName={currentCompanyName} setToast={setToast} />}
         {currentView === 'ataRepository' && <AtaRepositoryView onNavigateToAta={handleNavigateToAta} />}
         {currentView === 'deadlinePanel' && <DeadlineView onNavigateToAta={handleNavigateToAta} adminSettings={adminSettings} webhooks={webhooks} />}
+        {currentView === 'projectControl' && <ProjectControlView setToast={setToast} projetistas={projetistas} />}
+        {currentView === 'projectDashboard' && <ProjectDashboardView />}
         {currentView === 'settings' && <SettingsView 
             allProfiles={companyProfiles} 
             currentCompanyName={currentCompanyName} 
@@ -858,6 +926,10 @@ const App: React.FC = () => {
             onAddWebhook={handleAddWebhook}
             onUpdateWebhook={handleUpdateWebhook}
             onDeleteWebhook={handleDeleteWebhook}
+            projetistas={projetistas}
+            onAddProjetista={handleAddProjetista}
+            onUpdateProjetista={handleUpdateProjetista}
+            onDeleteProjetista={handleDeleteProjetista}
         />}
       </div>
     </div>

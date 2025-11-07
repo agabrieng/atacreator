@@ -1,7 +1,8 @@
-import React from 'react';
-import { GridIcon, FileTextIcon, ChevronLeftIcon, ChevronRightIcon, CalendarCheckIcon, SettingsIcon, ArchiveIcon } from './icons';
 
-type View = 'dashboard' | 'ataCreator' | 'deadlinePanel' | 'settings' | 'ataRepository';
+import React, { useState } from 'react';
+import { GridIcon, FileTextIcon, ChevronLeftIcon, ChevronRightIcon, CalendarCheckIcon, SettingsIcon, ArchiveIcon, SparklesIcon, BriefcaseIcon, ClipboardListIcon, TrendingUpIcon } from './icons';
+
+type View = 'dashboard' | 'ataCreator' | 'deadlinePanel' | 'settings' | 'ataRepository' | 'projectControl' | 'projectDashboard';
 
 interface SidebarProps {
   currentView: View;
@@ -37,6 +38,12 @@ const NavLink: React.FC<{
 };
 
 const Sidebar: React.FC<SidebarProps> = ({ currentView, setCurrentView, isCollapsed, toggleCollapse }) => {
+  const isAtaGroupActive = ['ataCreator', 'ataRepository', 'deadlinePanel'].includes(currentView);
+  const [isAtaMenuOpen, setIsAtaMenuOpen] = useState(isAtaGroupActive);
+
+  const isProjectGroupActive = ['projectControl', 'projectDashboard'].includes(currentView);
+  const [isProjectMenuOpen, setIsProjectMenuOpen] = useState(isProjectGroupActive);
+  
   return (
     <aside className={`fixed top-0 left-0 h-full bg-white dark:bg-slate-800 border-r border-slate-200 dark:border-slate-700 flex flex-col z-20 transition-all duration-300 ease-in-out ${isCollapsed ? 'w-20' : 'w-64'}`}>
       <div className={`flex items-center h-16 px-6 border-b border-slate-200 dark:border-slate-700 flex-shrink-0 ${isCollapsed ? 'justify-center' : ''}`}>
@@ -53,27 +60,100 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, setCurrentView, isCollap
           onClick={() => setCurrentView('dashboard')}
           isCollapsed={isCollapsed}
         />
-        <NavLink
-          icon={FileTextIcon}
-          label="Gerador de Atas"
-          isActive={currentView === 'ataCreator'}
-          onClick={() => setCurrentView('ataCreator')}
-          isCollapsed={isCollapsed}
-        />
-        <NavLink
-          icon={ArchiveIcon}
-          label="Repositório de Atas"
-          isActive={currentView === 'ataRepository'}
-          onClick={() => setCurrentView('ataRepository')}
-          isCollapsed={isCollapsed}
-        />
-        <NavLink
-          icon={CalendarCheckIcon}
-          label="Painel de Prazos"
-          isActive={currentView === 'deadlinePanel'}
-          onClick={() => setCurrentView('deadlinePanel')}
-          isCollapsed={isCollapsed}
-        />
+
+        {isCollapsed ? (
+          <NavLink
+            icon={FileTextIcon}
+            label="Gerador de ATA"
+            isActive={isAtaGroupActive}
+            onClick={() => setCurrentView('ataCreator')}
+            isCollapsed={isCollapsed}
+          />
+        ) : (
+          <div>
+            <button
+              onClick={() => setIsAtaMenuOpen(!isAtaMenuOpen)}
+              className={`w-full flex items-center px-4 py-3 text-sm font-medium rounded-lg transition-colors duration-200 ${
+                isAtaGroupActive
+                  ? 'bg-slate-200 dark:bg-slate-700 text-blue-600 dark:text-blue-300'
+                  : 'text-slate-600 dark:text-slate-300 hover:bg-slate-200/50 dark:hover:bg-slate-700/50'
+              }`}
+            >
+              <FileTextIcon className="w-5 h-5 flex-shrink-0 mr-3" />
+              <span className="flex-1 text-left font-medium">Gerador de ATA</span>
+              <ChevronRightIcon className={`w-4 h-4 transform transition-transform duration-200 ${isAtaMenuOpen ? 'rotate-90' : ''}`} />
+            </button>
+            {isAtaMenuOpen && (
+              <div className="pt-2 pl-5 space-y-1">
+                <NavLink
+                  icon={SparklesIcon}
+                  label="Gerador de Atas"
+                  isActive={currentView === 'ataCreator'}
+                  onClick={() => setCurrentView('ataCreator')}
+                  isCollapsed={isCollapsed}
+                />
+                <NavLink
+                  icon={ArchiveIcon}
+                  label="Repositório de Atas"
+                  isActive={currentView === 'ataRepository'}
+                  onClick={() => setCurrentView('ataRepository')}
+                  isCollapsed={isCollapsed}
+                />
+                <NavLink
+                  icon={CalendarCheckIcon}
+                  label="Painel de Prazos"
+                  isActive={currentView === 'deadlinePanel'}
+                  onClick={() => setCurrentView('deadlinePanel')}
+                  isCollapsed={isCollapsed}
+                />
+              </div>
+            )}
+          </div>
+        )}
+
+        {isCollapsed ? (
+            <NavLink
+                icon={BriefcaseIcon}
+                label="Controle de Projetos"
+                isActive={isProjectGroupActive}
+                onClick={() => setCurrentView('projectControl')}
+                isCollapsed={isCollapsed}
+            />
+        ) : (
+            <div>
+                <button
+                    onClick={() => setIsProjectMenuOpen(!isProjectMenuOpen)}
+                    className={`w-full flex items-center px-4 py-3 text-sm font-medium rounded-lg transition-colors duration-200 ${
+                    isProjectGroupActive
+                        ? 'bg-slate-200 dark:bg-slate-700 text-blue-600 dark:text-blue-300'
+                        : 'text-slate-600 dark:text-slate-300 hover:bg-slate-200/50 dark:hover:bg-slate-700/50'
+                    }`}
+                >
+                    <BriefcaseIcon className="w-5 h-5 flex-shrink-0 mr-3" />
+                    <span className="flex-1 text-left font-medium">Controle de Projetos</span>
+                    <ChevronRightIcon className={`w-4 h-4 transform transition-transform duration-200 ${isProjectMenuOpen ? 'rotate-90' : ''}`} />
+                </button>
+                {isProjectMenuOpen && (
+                    <div className="pt-2 pl-5 space-y-1">
+                        <NavLink
+                          icon={ClipboardListIcon}
+                          label="Acompanhamento"
+                          isActive={currentView === 'projectControl'}
+                          onClick={() => setCurrentView('projectControl')}
+                          isCollapsed={isCollapsed}
+                        />
+                        <NavLink
+                          icon={TrendingUpIcon}
+                          label="Dashboard de Projetos"
+                          isActive={currentView === 'projectDashboard'}
+                          onClick={() => setCurrentView('projectDashboard')}
+                          isCollapsed={isCollapsed}
+                        />
+                    </div>
+                )}
+            </div>
+        )}
+        
         <NavLink
           icon={SettingsIcon}
           label="Configurações"

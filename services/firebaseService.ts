@@ -8,9 +8,10 @@ import {
     updateDoc, 
     deleteDoc,
     query,
-    orderBy 
+    orderBy,
+    where, 
 } from "firebase/firestore";
-import type { AtaData, Empreendimento, Webhook } from '../types';
+import type { AtaData, Empreendimento, Webhook, Projetista, Projeto } from '../types';
 
 // As credenciais da conta de serviço não devem ser usadas no cliente.
 // O SDK da Web usa este objeto de configuração, que é seguro para expor.
@@ -42,6 +43,9 @@ const handleFirebaseError = (error: any, context: string): Error => {
 const empreendimentosCollectionRef = collection(db, 'empreendimentos');
 const atasCollectionRef = collection(db, 'atas');
 const webhooksCollectionRef = collection(db, 'webhooks');
+const projetistasCollectionRef = collection(db, 'projetistas');
+const projetosCollectionRef = collection(db, 'projetos');
+
 
 // --- Empreendimentos (Projetos) ---
 
@@ -80,6 +84,96 @@ export const deleteEmpreendimento = async (id: string): Promise<void> => {
   } catch (error) {
     throw handleFirebaseError(error, "excluir empreendimento");
   }
+};
+
+// --- Projetistas (Design Companies) ---
+
+export const getProjetistas = async (): Promise<Projetista[]> => {
+    try {
+        const q = query(projetistasCollectionRef, orderBy('name'));
+        const querySnapshot = await getDocs(q);
+        return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Projetista));
+    } catch (error) {
+        throw handleFirebaseError(error, "obter empresas projetistas");
+    }
+};
+
+export const addProjetista = async (name: string, logo: string | null): Promise<string> => {
+    try {
+        const docRef = await addDoc(projetistasCollectionRef, { name, logo });
+        return docRef.id;
+    } catch (error) {
+        throw handleFirebaseError(error, "adicionar empresa projetista");
+    }
+};
+
+export const updateProjetista = async (id: string, name: string, logo: string | null): Promise<void> => {
+    try {
+        const projetistaDoc = doc(db, 'projetistas', id);
+        await updateDoc(projetistaDoc, { name, logo });
+    } catch (error) {
+        throw handleFirebaseError(error, "atualizar empresa projetista");
+    }
+};
+
+export const deleteProjetista = async (id: string): Promise<void> => {
+  try {
+    // Delete all projects associated with this projetista first
+    const projetosQuery = query(projetosCollectionRef, where('projetistaId', '==', id));
+    const projetosSnapshot = await getDocs(projetosQuery);
+    
+    const deletePromises: Promise<void>[] = [];
+    projetosSnapshot.forEach((document) => {
+        deletePromises.push(deleteDoc(document.ref));
+    });
+    
+    await Promise.all(deletePromises);
+
+    // Then delete the projetista itself
+    const projetistaDoc = doc(db, 'projetistas', id);
+    await deleteDoc(projetistaDoc);
+  } catch (error) {
+    throw handleFirebaseError(error, "excluir empresa projetista e seus projetos");
+  }
+};
+
+
+// --- Projetos (Deliverables) ---
+
+export const getProjetos = async (): Promise<Projeto[]> => {
+    try {
+        const querySnapshot = await getDocs(projetosCollectionRef);
+        return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Projeto));
+    } catch (error) {
+        throw handleFirebaseError(error, "obter projetos");
+    }
+};
+
+export const addProjeto = async (projetoData: Omit<Projeto, 'id'>): Promise<string> => {
+    try {
+        const docRef = await addDoc(projetosCollectionRef, projetoData);
+        return docRef.id;
+    } catch (error) {
+        throw handleFirebaseError(error, "adicionar projeto");
+    }
+};
+
+export const updateProjeto = async (id: string, dataToUpdate: Partial<Omit<Projeto, 'id'>>): Promise<void> => {
+    try {
+        const projetoDoc = doc(db, 'projetos', id);
+        await updateDoc(projetoDoc, dataToUpdate);
+    } catch (error) {
+        throw handleFirebaseError(error, "atualizar projeto");
+    }
+};
+
+export const deleteProjeto = async (id: string): Promise<void> => {
+    try {
+        const projetoDoc = doc(db, 'projetos', id);
+        await deleteDoc(projetoDoc);
+    } catch (error) {
+        throw handleFirebaseError(error, "excluir projeto");
+    }
 };
 
 
