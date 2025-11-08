@@ -112,7 +112,8 @@ const ProjectStatusPieChart: React.FC<{ projects: Projeto[] }> = React.memo(({ p
 
 const ProjectsByCompanyChart: React.FC<{ projects: Projeto[]; projetistas: Projetista[] }> = React.memo(({ projects, projetistas }) => {
     const data = useMemo(() => {
-        const projetistaMap = new Map(projetistas.map((p: Projetista) => [p.id, p.name]));
+        // FIX: Explicitly type the Map constructor to ensure correct type inference for projetistaMap.
+        const projetistaMap = new Map<string, string>(projetistas.map((p: Projetista) => [p.id, p.name]));
         const counts = new Map<string, number>();
 
         projects.forEach((proj: Projeto) => {
@@ -355,7 +356,7 @@ const ProjectDeadlineTrendChart: React.FC<{ projects: Projeto[]; projetistas: Pr
             </div>
             {involvedProjetistas.length > 0 ? (
                 <>
-                <div className="relative h-64" ref={containerRef}>
+                <div className="relative h-96" ref={containerRef}>
                     <svg width="100%" height="100%" viewBox="0 0 400 300" preserveAspectRatio="xMidYMid meet">
                         {/* Y-Axis Grid & Labels */}
                         {Array.from({length: 6}).map((_, i) => (

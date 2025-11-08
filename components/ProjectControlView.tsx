@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { getProjetos, addProjeto, updateProjeto, deleteProjeto } from '../services/firebaseService';
 import type { Projetista, Projeto, ProjectStatus, Disciplina, Empreendimento } from '../types';
 import { disciplinas } from '../types';
-import { BriefcaseIcon, AlertTriangleIcon, ChevronRightIcon, PlusIcon, EditIcon, TrashIcon, XIcon } from './icons';
+import { BriefcaseIcon, AlertTriangleIcon, ChevronRightIcon, PlusIcon, EditIcon, TrashIcon, XIcon, SearchIcon, FilterIcon } from './icons';
 import ConfirmationDialog from './ConfirmationDialog';
 
 // Define a type for the toast function prop for better type safety.
@@ -21,7 +21,7 @@ const getStatusWithOverdueCheck = (status: ProjectStatus, deadline: string): Pro
     }
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    const deadlineDate = new Date(deadline);
+    const deadlineDate = new Date(`${deadline}T00:00:00`);
     if (deadlineDate < today) {
         return 'overdue';
     }
@@ -32,12 +32,38 @@ const ProjectControlView: React.FC<{ setToast: ToastFunc; projetistas: Projetist
     const [projetos, setProjetos] = useState<Projeto[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
-    const [expandedKeys, setExpandedKeys] = useState<Record<string, boolean>>({});
+    
+    // Filter states
+    const [searchQuery, setSearchQuery] = useState('');
+    const [selectedEmpreendimento, setSelectedEmpreendimento] = useState('all');
+    const [selectedProjetista, setSelectedProjetista] = useState('all');
+    const [selectedDisciplina, setSelectedDisciplina] = useState<Disciplina | 'all'>('all');
+    const [selectedStatus, setSelectedStatus] = useState<ProjectStatus | 'all'>('all');
+    const [startDate, setStartDate] = useState('');
+    const [endDate, setEndDate] = useState('');
+    
+    // State for user's manual interactions with accordions
+    const [manualExpandedKeys, setManualExpandedKeys] = useState<Record<string, boolean>>({});
+    // State for what is actually displayed as expanded/collapsed
+    const [displayExpandedKeys, setDisplayExpandedKeys] = useState<Record<string, boolean>>({});
+
 
     // Modal/Form State
     const [isProjetoModalOpen, setIsProjetoModalOpen] = useState(false);
     const [editingProjeto, setEditingProjeto] = useState<Partial<Projeto> | null>(null);
     const [projetoToDelete, setProjetoToDelete] = useState<Projeto | null>(null);
+
+    const isFiltering = useMemo(() => {
+        return (
+            searchQuery.trim() !== '' ||
+            selectedEmpreendimento !== 'all' ||
+            selectedProjetista !== 'all' ||
+            selectedDisciplina !== 'all' ||
+            selectedStatus !== 'all' ||
+            startDate !== '' ||
+            endDate !== ''
+        );
+    }, [searchQuery, selectedEmpreendimento, selectedProjetista, selectedDisciplina, selectedStatus, startDate, endDate]);
 
     const fetchData = async () => {
         setIsLoading(true);
@@ -58,12 +84,77 @@ const ProjectControlView: React.FC<{ setToast: ToastFunc; projetistas: Projetist
     }, []);
 
     const toggleExpand = (key: string) => {
-        setExpandedKeys(prev => ({ ...prev, [key]: !prev[key] }));
+        // When user toggles, always update the manual state
+        setManualExpandedKeys(prev => ({ ...prev, [key]: !prev[key] }));
     };
 
     const projetistaMap = useMemo(() => {
         return new Map(projetistas.map(p => [p.id, p]));
     }, [projetistas]);
+
+    const uniqueEmpreendimentos = useMemo(() => {
+        return Array.from(new Set(projetos.map(p => p.empreendimento))).sort();
+    }, [projetos]);
+
+    const filteredProjetos = useMemo(() => {
+        return projetos.filter(projeto => {
+            const currentStatus = getStatusWithOverdueCheck(projeto.status, projeto.deadline);
+
+            if (selectedEmpreendimento !== 'all' && projeto.empreendimento !== selectedEmpreendimento) return false;
+            if (selectedProjetista !== 'all' && projeto.projetistaId !== selectedProjetista) return false;
+            if (selectedDisciplina !== 'all' && projeto.disciplina !== selectedDisciplina) return false;
+            if (selectedStatus !== 'all' && currentStatus !== selectedStatus) return false;
+
+            if (startDate || endDate) {
+                const deadlineDate = new Date(`${projeto.deadline}T00:00:00`);
+                if (startDate) {
+                    const start = new Date(`${startDate}T00:00:00`);
+                    if (deadlineDate < start) return false;
+                }
+                if (endDate) {
+                    const end = new Date(`${endDate}T00:00:00`);
+                    if (deadlineDate > end) return false;
+                }
+            }
+
+            if (searchQuery.trim()) {
+                const lowercasedQuery = searchQuery.toLowerCase();
+                const projetista = projetistaMap.get(projeto.projetistaId);
+                const matches =
+                    projeto.name.toLowerCase().includes(lowercasedQuery) ||
+                    projeto.description.toLowerCase().includes(lowercasedQuery) ||
+                    projeto.contrato.toLowerCase().includes(lowercasedQuery) ||
+                    (projeto.taxonomia && projeto.taxonomia.toLowerCase().includes(lowercasedQuery)) ||
+                    projeto.empreendimento.toLowerCase().includes(lowercasedQuery) ||
+                    (projetista && projetista.name.toLowerCase().includes(lowercasedQuery));
+                if (!matches) return false;
+            }
+
+            return true;
+        });
+    }, [projetos, searchQuery, selectedEmpreendimento, selectedProjetista, selectedDisciplina, selectedStatus, startDate, endDate, projetistaMap]);
+
+    // Update display state based on filtering or manual changes
+    useEffect(() => {
+        if (isFiltering) {
+            const keysToExpand: Record<string, boolean> = {};
+            if (filteredProjetos.length > 0) {
+                filteredProjetos.forEach(projeto => {
+                    const empKey = `emp-${projeto.empreendimento}`;
+                    const projKey = `${empKey}_proj-${projeto.projetistaId}`;
+                    const discKey = `${projKey}_disc-${projeto.disciplina}`;
+                    keysToExpand[empKey] = true;
+                    keysToExpand[projKey] = true;
+                    keysToExpand[discKey] = true;
+                });
+            }
+            setDisplayExpandedKeys(keysToExpand);
+        } else {
+            // When not filtering, reflect the user's manual choices
+            setDisplayExpandedKeys(manualExpandedKeys);
+        }
+    }, [isFiltering, filteredProjetos, manualExpandedKeys]);
+
 
     // Fix: Changed interface to a type alias with Record to improve type inference.
     type GroupedData = Record<string, Record<string, Record<string, Projeto[]>>>;
@@ -72,7 +163,7 @@ const ProjectControlView: React.FC<{ setToast: ToastFunc; projetistas: Projetist
         const grouped: GroupedData = {};
         
         // Sort all projects by deadline first
-        const sortedProjetos = [...projetos].sort((a, b) => new Date(a.deadline).getTime() - new Date(b.deadline).getTime());
+        const sortedProjetos = [...filteredProjetos].sort((a, b) => new Date(a.deadline).getTime() - new Date(b.deadline).getTime());
 
         for (const projeto of sortedProjetos) {
             const emp = projeto.empreendimento || 'Sem Empreendimento';
@@ -86,7 +177,19 @@ const ProjectControlView: React.FC<{ setToast: ToastFunc; projetistas: Projetist
             grouped[emp][projId][disc].push(projeto);
         }
         return grouped;
-    }, [projetos]);
+    }, [filteredProjetos]);
+
+    const resetFilters = () => {
+        setSearchQuery('');
+        setSelectedEmpreendimento('all');
+        setSelectedProjetista('all');
+        setSelectedDisciplina('all');
+        setSelectedStatus('all');
+        setStartDate('');
+        setEndDate('');
+        // No need to touch expansion state here, the useEffect will handle it
+        // because `isFiltering` will become false, reverting to manualExpandedKeys.
+    };
 
     // Handlers for Projetos
     const handleSaveProjeto = async (data: Omit<Projeto, 'id'>) => {
@@ -155,25 +258,96 @@ const ProjectControlView: React.FC<{ setToast: ToastFunc; projetistas: Projetist
         );
     }
     
+    const FilterInput: React.FC<{label: string, children: React.ReactNode}> = ({label, children}) => (
+        <div>
+            <label className="block text-xs font-medium text-slate-600 dark:text-slate-300 mb-1">{label}</label>
+            {children}
+        </div>
+    );
+    
     return (
         <main className="container mx-auto p-4 md:p-8">
             <header className="mb-8 flex justify-between items-center">
                 <div>
                     <h1 className="text-3xl font-bold text-slate-800 dark:text-slate-100 flex items-center">
                         <BriefcaseIcon className="w-8 h-8 mr-3 text-slate-500" />
-                        Acompanhamento de Projetos
+                        Cronograma de Projetos
                     </h1>
                     <p className="text-slate-500 dark:text-slate-400">Gerencie os entregáveis das empresas projetistas contratadas.</p>
                 </div>
                  <button onClick={() => { setEditingProjeto({ projetistaId: '', empreendimento: '', contrato: '', taxonomia: '', disciplina: 'Civil' }); setIsProjetoModalOpen(true); }} className="inline-flex items-center px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700 shadow-sm"><PlusIcon className="w-5 h-5 mr-2"/> Novo Projeto</button>
             </header>
 
+            <div className="bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-lg p-4 mb-6">
+                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6 gap-4">
+                    <div className="xl:col-span-2">
+                        <FilterInput label="Buscar por Termo">
+                             <div className="relative">
+                                <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 dark:text-slate-500" />
+                                <input
+                                    type="text" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)}
+                                    placeholder="Nome, contrato, empresa..."
+                                    className="w-full pl-9 pr-4 py-2 text-sm bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                />
+                            </div>
+                        </FilterInput>
+                    </div>
+                    <FilterInput label="Empreendimento">
+                         <select value={selectedEmpreendimento} onChange={e => setSelectedEmpreendimento(e.target.value)} className="w-full text-sm px-3 py-2 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-md shadow-sm">
+                            <option value="all">Todos</option>
+                            {uniqueEmpreendimentos.map(e => <option key={e} value={e}>{e}</option>)}
+                        </select>
+                    </FilterInput>
+                    <FilterInput label="Empresa Projetista">
+                         <select value={selectedProjetista} onChange={e => setSelectedProjetista(e.target.value)} className="w-full text-sm px-3 py-2 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-md shadow-sm">
+                            <option value="all">Todas</option>
+                            {projetistas.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                        </select>
+                    </FilterInput>
+                    <FilterInput label="Disciplina">
+                         <select value={selectedDisciplina} onChange={e => setSelectedDisciplina(e.target.value as any)} className="w-full text-sm px-3 py-2 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-md shadow-sm">
+                            <option value="all">Todas</option>
+                            {disciplinas.map(d => <option key={d} value={d}>{d}</option>)}
+                        </select>
+                    </FilterInput>
+                    <FilterInput label="Status">
+                         <select value={selectedStatus} onChange={e => setSelectedStatus(e.target.value as any)} className="w-full text-sm px-3 py-2 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-md shadow-sm">
+                            <option value="all">Todos</option>
+                            {Object.entries(statusConfig).map(([key, value]) => (<option key={key} value={key}>{value.text}</option>))}
+                        </select>
+                    </FilterInput>
+                    <div className="sm:col-span-2 lg:col-span-4 xl:col-span-3 grid grid-cols-2 gap-4">
+                        <FilterInput label="Prazo de">
+                             <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className="w-full text-sm px-3 py-2 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-md shadow-sm"/>
+                        </FilterInput>
+                        <FilterInput label="Prazo até">
+                             <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} className="w-full text-sm px-3 py-2 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-md shadow-sm"/>
+                        </FilterInput>
+                    </div>
+                     <div className="flex items-end">
+                        <button onClick={resetFilters} className="w-full text-sm px-3 py-2 bg-white dark:bg-slate-700 font-medium text-slate-700 dark:text-slate-200 border border-slate-300 dark:border-slate-600 rounded-md shadow-sm hover:bg-slate-100 dark:hover:bg-slate-600">
+                            Limpar Filtros
+                        </button>
+                    </div>
+                </div>
+            </div>
+
             <div className="space-y-4">
                 {Object.entries(groupedData).length === 0 ? (
                     <div className="text-center py-16 border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-lg">
-                        <BriefcaseIcon className="w-16 h-16 mb-4 text-slate-300 dark:text-slate-600 mx-auto" />
-                        <h3 className="text-lg font-semibold text-slate-700 dark:text-slate-200">Nenhum Projeto Cadastrado</h3>
-                        <p className="max-w-md mt-1 text-sm text-slate-500 dark:text-slate-400 mx-auto">Clique em "Novo Projeto" para começar a gerenciar seus entregáveis.</p>
+                        {isFiltering ? (
+                            <>
+                                <SearchIcon className="w-16 h-16 mb-4 text-slate-300 dark:text-slate-600 mx-auto" />
+                                <h3 className="text-lg font-semibold text-slate-700 dark:text-slate-200">Nenhum Projeto Encontrado</h3>
+                                <p className="max-w-md mt-1 text-sm text-slate-500 dark:text-slate-400 mx-auto">Tente ajustar seus filtros ou clique em "Limpar Filtros".</p>
+                            </>
+                        ) : (
+                            <>
+                                <BriefcaseIcon className="w-16 h-16 mb-4 text-slate-300 dark:text-slate-600 mx-auto" />
+                                <h3 className="text-lg font-semibold text-slate-700 dark:text-slate-200">Nenhum Projeto Cadastrado</h3>
+                                <p className="max-w-md mt-1 text-sm text-slate-500 dark:text-slate-400 mx-auto">Clique em "Novo Projeto" para começar a gerenciar seus entregáveis.</p>
+                            </>
+                        )}
                     </div>
                 ) : (
                     Object.entries(groupedData).map(([empreendimento, projetistasGroup]) => {
@@ -183,32 +357,34 @@ const ProjectControlView: React.FC<{ setToast: ToastFunc; projetistas: Projetist
                             <div key={empKey} className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-sm">
                                 <button className="w-full flex items-center justify-between p-4 text-left" onClick={() => toggleExpand(empKey)}>
                                     <h2 className="text-xl font-bold text-slate-800 dark:text-slate-100">{empreendimento}</h2>
-                                    <div className="flex items-center"><span className="text-sm text-slate-500 dark:text-slate-400 mr-4">{totalProjetosEmpreendimento} projeto(s)</span><ChevronRightIcon className={`w-6 h-6 text-slate-500 transform transition-transform ${expandedKeys[empKey] ? 'rotate-90' : ''}`} /></div>
+                                    <div className="flex items-center"><span className="text-sm text-slate-500 dark:text-slate-400 mr-4">{totalProjetosEmpreendimento} projeto(s)</span><ChevronRightIcon className={`w-6 h-6 text-slate-500 transform transition-transform ${displayExpandedKeys[empKey] ? 'rotate-90' : ''}`} /></div>
                                 </button>
-                                {expandedKeys[empKey] && (
+                                {displayExpandedKeys[empKey] && (
                                     <div className="p-2 space-y-2">
                                         {Object.entries(projetistasGroup).map(([projetistaId, disciplinasGroup]) => {
+                                            // FIX: Cast disciplinasGroup to its correct type to resolve TS inference error.
+                                            const discGroupTyped = disciplinasGroup as Record<string, Projeto[]>;
                                             const projKey = `${empKey}_proj-${projetistaId}`;
                                             const projetista = projetistaMap.get(projetistaId);
                                             if (!projetista) return null;
-                                            const totalProjetosProjetista = Object.values(disciplinasGroup).flat().length;
+                                            const totalProjetosProjetista = Object.values(discGroupTyped).flat().length;
                                             return (
                                                 <div key={projKey} className="bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-lg ml-4">
                                                     <button className="w-full flex items-center justify-between p-3 text-left" onClick={() => toggleExpand(projKey)}>
                                                         <div className="flex items-center"><div className="w-8 h-8 bg-slate-200 dark:bg-slate-700 rounded-full flex items-center justify-center overflow-hidden mr-3">{projetista.logo ? <img src={projetista.logo} alt={projetista.name} className="w-full h-full object-cover" /> : <BriefcaseIcon className="w-4 h-4 text-slate-500"/>}</div><h3 className="text-lg font-semibold text-slate-700 dark:text-slate-200">{projetista.name}</h3></div>
-                                                        <div className="flex items-center"><span className="text-xs text-slate-500 dark:text-slate-400 mr-3">{totalProjetosProjetista} projeto(s)</span><ChevronRightIcon className={`w-5 h-5 text-slate-500 transform transition-transform ${expandedKeys[projKey] ? 'rotate-90' : ''}`} /></div>
+                                                        <div className="flex items-center"><span className="text-xs text-slate-500 dark:text-slate-400 mr-3">{totalProjetosProjetista} projeto(s)</span><ChevronRightIcon className={`w-5 h-5 text-slate-500 transform transition-transform ${displayExpandedKeys[projKey] ? 'rotate-90' : ''}`} /></div>
                                                     </button>
-                                                    {expandedKeys[projKey] && (
+                                                    {displayExpandedKeys[projKey] && (
                                                         <div className="p-2 space-y-2">
-                                                            {Object.entries(disciplinasGroup).map(([disciplina, projetosInDisciplina]) => {
+                                                            {Object.entries(discGroupTyped).map(([disciplina, projetosInDisciplina]) => {
                                                                 const discKey = `${projKey}_disc-${disciplina}`;
                                                                 return (
                                                                     <div key={discKey} className="bg-white dark:bg-slate-700/60 border border-slate-200 dark:border-slate-600 rounded-md ml-4">
                                                                         <button className="w-full flex items-center justify-between p-2 text-left" onClick={() => toggleExpand(discKey)}>
                                                                             <h4 className="font-semibold text-slate-600 dark:text-slate-300">{disciplina}</h4>
-                                                                            <div className="flex items-center"><span className="text-xs text-slate-500 dark:text-slate-400 mr-2">{projetosInDisciplina.length} projeto(s)</span><ChevronRightIcon className={`w-4 h-4 text-slate-500 transform transition-transform ${expandedKeys[discKey] ? 'rotate-90' : ''}`} /></div>
+                                                                            <div className="flex items-center"><span className="text-xs text-slate-500 dark:text-slate-400 mr-2">{projetosInDisciplina.length} projeto(s)</span><ChevronRightIcon className={`w-4 h-4 text-slate-500 transform transition-transform ${displayExpandedKeys[discKey] ? 'rotate-90' : ''}`} /></div>
                                                                         </button>
-                                                                        {expandedKeys[discKey] && (
+                                                                        {displayExpandedKeys[discKey] && (
                                                                             <div className="p-4 space-y-3 border-t border-slate-100 dark:border-slate-600">
                                                                                 {projetosInDisciplina.map(proj => {
                                                                                     const currentStatus = getStatusWithOverdueCheck(proj.status, proj.deadline);
