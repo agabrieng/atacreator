@@ -1,5 +1,5 @@
 {
-  "name": "ATA creator",
-  "description": "Uma aplicação web que utiliza IA para analisar transcrições de reuniões do Microsoft Teams (em formato VTT) e gerar automaticamente atas de reunião profissionais e estruturadas.",
+  "name": "Claritas",
+  "description": "Claritas: Uma aplicação web que utiliza IA para analisar transcrições de reuniões e gerar automaticamente atas profissionais e estruturadas.",
   "requestFramePermissions": []
 }

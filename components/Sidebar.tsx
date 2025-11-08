@@ -1,4 +1,5 @@
 
+
 import React, { useState } from 'react';
 import { GridIcon, FileTextIcon, ChevronLeftIcon, ChevronRightIcon, CalendarCheckIcon, SettingsIcon, ArchiveIcon, SparklesIcon, BriefcaseIcon, ClipboardListIcon, TrendingUpIcon } from './icons';
 
@@ -38,7 +39,7 @@ const NavLink: React.FC<{
 };
 
 const Sidebar: React.FC<SidebarProps> = ({ currentView, setCurrentView, isCollapsed, toggleCollapse }) => {
-  const isAtaGroupActive = ['ataCreator', 'ataRepository', 'deadlinePanel'].includes(currentView);
+  const isAtaGroupActive = ['dashboard', 'ataCreator', 'ataRepository', 'deadlinePanel'].includes(currentView);
   const [isAtaMenuOpen, setIsAtaMenuOpen] = useState(isAtaGroupActive);
 
   const isProjectGroupActive = ['projectControl', 'projectDashboard'].includes(currentView);
@@ -49,24 +50,16 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, setCurrentView, isCollap
       <div className={`flex items-center h-16 px-6 border-b border-slate-200 dark:border-slate-700 flex-shrink-0 ${isCollapsed ? 'justify-center' : ''}`}>
         <FileTextIcon className="w-8 h-8 text-blue-600 dark:text-blue-400 flex-shrink-0" />
         <h1 className={`ml-3 text-xl font-bold text-slate-800 dark:text-slate-100 whitespace-nowrap transition-opacity duration-200 ${isCollapsed ? 'opacity-0' : 'opacity-100'}`}>
-          ATA Creator
+          Claritas
         </h1>
       </div>
       <nav className="flex-1 p-4 space-y-2 overflow-y-auto overflow-x-hidden">
-        <NavLink
-          icon={GridIcon}
-          label="Dashboard"
-          isActive={currentView === 'dashboard'}
-          onClick={() => setCurrentView('dashboard')}
-          isCollapsed={isCollapsed}
-        />
-
         {isCollapsed ? (
           <NavLink
             icon={FileTextIcon}
             label="Gerador de ATA"
             isActive={isAtaGroupActive}
-            onClick={() => setCurrentView('ataCreator')}
+            onClick={() => setCurrentView('dashboard')}
             isCollapsed={isCollapsed}
           />
         ) : (
@@ -85,6 +78,13 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, setCurrentView, isCollap
             </button>
             {isAtaMenuOpen && (
               <div className="pt-2 pl-5 space-y-1">
+                <NavLink
+                  icon={GridIcon}
+                  label="Dashboard"
+                  isActive={currentView === 'dashboard'}
+                  onClick={() => setCurrentView('dashboard')}
+                  isCollapsed={isCollapsed}
+                />
                 <NavLink
                   icon={SparklesIcon}
                   label="Gerador de Atas"
