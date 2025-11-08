@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { getProjetos, addProjeto, updateProjeto, deleteProjeto } from '../services/firebaseService';
-import type { Projetista, Projeto, ProjectStatus, Disciplina } from '../types';
+import type { Projetista, Projeto, ProjectStatus, Disciplina, Empreendimento } from '../types';
 import { disciplinas } from '../types';
 import { BriefcaseIcon, AlertTriangleIcon, ChevronRightIcon, PlusIcon, EditIcon, TrashIcon, XIcon } from './icons';
 import ConfirmationDialog from './ConfirmationDialog';
@@ -28,7 +28,7 @@ const getStatusWithOverdueCheck = (status: ProjectStatus, deadline: string): Pro
     return status;
 }
 
-const ProjectControlView: React.FC<{ setToast: ToastFunc; projetistas: Projetista[] }> = ({ setToast, projetistas }) => {
+const ProjectControlView: React.FC<{ setToast: ToastFunc; projetistas: Projetista[], empreendimentos: Empreendimento[] }> = ({ setToast, projetistas, empreendimentos }) => {
     const [projetos, setProjetos] = useState<Projeto[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -257,7 +257,7 @@ const ProjectControlView: React.FC<{ setToast: ToastFunc; projetistas: Projetist
                 )}
             </div>
 
-            {isProjetoModalOpen && <ProjetoFormModal initialData={editingProjeto} projetistas={projetistas} onSave={handleSaveProjeto} onClose={() => setIsProjetoModalOpen(false)} />}
+            {isProjetoModalOpen && <ProjetoFormModal initialData={editingProjeto} projetistas={projetistas} empreendimentos={empreendimentos} onSave={handleSaveProjeto} onClose={() => setIsProjetoModalOpen(false)} />}
              <ConfirmationDialog isOpen={!!projetoToDelete} onClose={() => setProjetoToDelete(null)} onConfirm={handleDeleteProjeto} title="Excluir Projeto" confirmText="Excluir">
                 Tem certeza que deseja excluir o projeto <strong>"{projetoToDelete?.name}"</strong>?
             </ConfirmationDialog>
@@ -265,7 +265,13 @@ const ProjectControlView: React.FC<{ setToast: ToastFunc; projetistas: Projetist
     );
 };
 
-const ProjetoFormModal: React.FC<{ initialData: Partial<Projeto> | null; projetistas: Projetista[]; onSave: (data: Omit<Projeto, 'id'>) => void; onClose: () => void; }> = ({ initialData, projetistas, onSave, onClose }) => {
+const ProjetoFormModal: React.FC<{ 
+    initialData: Partial<Projeto> | null; 
+    projetistas: Projetista[]; 
+    empreendimentos: Empreendimento[];
+    onSave: (data: Omit<Projeto, 'id'>) => void; 
+    onClose: () => void; 
+}> = ({ initialData, projetistas, empreendimentos, onSave, onClose }) => {
     const [projetistaId, setProjetistaId] = useState(initialData?.projetistaId || '');
     const [name, setName] = useState(initialData?.name || '');
     const [description, setDescription] = useState(initialData?.description || '');
@@ -277,6 +283,15 @@ const ProjetoFormModal: React.FC<{ initialData: Partial<Projeto> | null; projeti
     const [disciplina, setDisciplina] = useState<Disciplina>(initialData?.disciplina || 'Civil');
     const [dataEntrega, setDataEntrega] = useState<string | null | undefined>(initialData?.dataEntrega);
 
+    useEffect(() => {
+        const selectedEmpreendimento = empreendimentos.find(e => e.name === empreendimento);
+        if (selectedEmpreendimento) {
+            setContrato(selectedEmpreendimento.contrato);
+        } else if (!initialData?.id) { 
+            // Only clear contrato if it's a new project and empreendimento is deselected
+            setContrato('');
+        }
+    }, [empreendimento, empreendimentos, initialData]);
 
     const handleSave = () => {
         if (projetistaId && name.trim() && deadline && empreendimento.trim() && contrato.trim()) {
@@ -304,70 +319,87 @@ const ProjetoFormModal: React.FC<{ initialData: Partial<Projeto> | null; projeti
     };
     
     return (
-        <div className="fixed inset-0 bg-black bg-opacity-60 z-50 flex items-center justify-center p-4" onClick={onClose}>
-            <div className="bg-white dark:bg-slate-800 rounded-xl shadow-2xl w-full max-w-lg" onClick={e => e.stopPropagation()}>
-                <div className="p-6">
+        <div className="fixed inset-0 bg-black bg-opacity-60 z-50 flex items-center justify-center p-4">
+            <div className="bg-white dark:bg-slate-800 rounded-xl shadow-2xl w-full max-w-lg flex flex-col max-h-[90vh]" onClick={e => e.stopPropagation()}>
+                <div className="flex justify-between items-center p-4 border-b border-slate-200 dark:border-slate-700">
                     <h3 className="text-lg font-bold text-slate-900 dark:text-slate-100">{initialData?.id ? 'Editar' : 'Adicionar'} Projeto</h3>
-                    <div className="mt-4 space-y-4 max-h-[60vh] overflow-y-auto pr-2">
-                         <div>
-                            <label htmlFor="projetista-select" className="block text-sm font-medium">Empresa Responsável<span className="text-red-500"> *</span></label>
-                            <select id="projetista-select" value={projetistaId} onChange={e => setProjetistaId(e.target.value)} className="mt-1 w-full p-2 border border-slate-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-700 disabled:bg-slate-100 dark:disabled:bg-slate-900">
-                                <option value="" disabled>Selecione uma empresa</option>
-                                {projetistas.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                    <button onClick={onClose} className="p-1 rounded-full text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700">
+                        <XIcon className="w-5 h-5" />
+                    </button>
+                </div>
+                <div className="p-6 space-y-4 overflow-y-auto">
+                    <div>
+                        <label htmlFor="projetista-select" className="block text-sm font-medium">Empresa Responsável<span className="text-red-500"> *</span></label>
+                        <select id="projetista-select" value={projetistaId} onChange={e => setProjetistaId(e.target.value)} className="mt-1 w-full p-2 border border-slate-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-700 disabled:bg-slate-100 dark:disabled:bg-slate-900">
+                            <option value="" disabled>Selecione uma empresa</option>
+                            {projetistas.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                        </select>
+                    </div>
+                    <div>
+                        <label htmlFor="empreendimento-select" className="block text-sm font-medium">Empreendimento<span className="text-red-500"> *</span></label>
+                        <select 
+                            id="empreendimento-select" 
+                            value={empreendimento} 
+                            onChange={e => setEmpreendimento(e.target.value)} 
+                            className="mt-1 w-full p-2 border border-slate-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-700"
+                        >
+                            <option value="" disabled>Selecione um empreendimento</option>
+                            {empreendimentos.map(e => <option key={e.id} value={e.name}>{e.name}</option>)}
+                        </select>
+                    </div>
+                    <div>
+                        <label htmlFor="projeto-name" className="block text-sm font-medium">Nome do Projeto/Entregável<span className="text-red-500"> *</span></label>
+                        <input id="projeto-name" type="text" value={name} onChange={e => setName(e.target.value)} className="mt-1 w-full p-2 border border-slate-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-700" />
+                    </div>
+                    <div>
+                        <label htmlFor="projeto-desc" className="block text-sm font-medium">Descrição</label>
+                        <textarea id="projeto-desc" value={description} onChange={e => setDescription(e.target.value)} rows={3} className="mt-1 w-full p-2 border border-slate-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-700 resize-y" />
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                        <div>
+                            <label htmlFor="contrato" className="block text-sm font-medium">Nº do Contrato<span className="text-red-500"> *</span></label>
+                            <input 
+                                id="contrato" 
+                                type="text" 
+                                value={contrato} 
+                                readOnly 
+                                className="mt-1 w-full p-2 border border-slate-300 dark:border-slate-600 rounded-md bg-slate-100 dark:bg-slate-900 cursor-not-allowed" 
+                            />
+                        </div>
+                        <div>
+                            <label htmlFor="taxonomia" className="block text-sm font-medium">Taxonomia (Código)</label>
+                            <input id="taxonomia" type="text" value={taxonomia} onChange={e => setTaxonomia(e.target.value)} className="mt-1 w-full p-2 border border-slate-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-700" />
+                        </div>
+                        <div>
+                            <label htmlFor="disciplina" className="block text-sm font-medium">Disciplina<span className="text-red-500"> *</span></label>
+                            <select id="disciplina" value={disciplina} onChange={e => setDisciplina(e.target.value as Disciplina)} className="mt-1 w-full p-2 border border-slate-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-700">
+                                {disciplinas.map(d => <option key={d} value={d}>{d}</option>)}
                             </select>
                         </div>
-                        <div>
-                            <label htmlFor="empreendimento" className="block text-sm font-medium">Empreendimento<span className="text-red-500"> *</span></label>
-                            <input id="empreendimento" type="text" value={empreendimento} onChange={e => setEmpreendimento(e.target.value)} className="mt-1 w-full p-2 border border-slate-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-700" />
-                        </div>
-                        <div>
-                            <label htmlFor="projeto-name" className="block text-sm font-medium">Nome do Projeto/Entregável<span className="text-red-500"> *</span></label>
-                            <input id="projeto-name" type="text" value={name} onChange={e => setName(e.target.value)} className="mt-1 w-full p-2 border border-slate-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-700" />
-                        </div>
-                         <div>
-                            <label htmlFor="projeto-desc" className="block text-sm font-medium">Descrição</label>
-                            <textarea id="projeto-desc" value={description} onChange={e => setDescription(e.target.value)} rows={3} className="mt-1 w-full p-2 border border-slate-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-700 resize-y" />
-                        </div>
-                        <div className="grid grid-cols-2 gap-4">
-                            <div>
-                                <label htmlFor="contrato" className="block text-sm font-medium">Nº do Contrato<span className="text-red-500"> *</span></label>
-                                <input id="contrato" type="text" value={contrato} onChange={e => setContrato(e.target.value)} className="mt-1 w-full p-2 border border-slate-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-700" />
-                            </div>
-                            <div>
-                                <label htmlFor="taxonomia" className="block text-sm font-medium">Taxonomia (Código)</label>
-                                <input id="taxonomia" type="text" value={taxonomia} onChange={e => setTaxonomia(e.target.value)} className="mt-1 w-full p-2 border border-slate-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-700" />
-                            </div>
-                             <div>
-                                <label htmlFor="disciplina" className="block text-sm font-medium">Disciplina<span className="text-red-500"> *</span></label>
-                                <select id="disciplina" value={disciplina} onChange={e => setDisciplina(e.target.value as Disciplina)} className="mt-1 w-full p-2 border border-slate-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-700">
-                                    {disciplinas.map(d => <option key={d} value={d}>{d}</option>)}
-                                </select>
-                            </div>
-                        </div>
-
-                        <div className="grid grid-cols-2 gap-4">
-                             <div>
-                                <label htmlFor="projeto-deadline" className="block text-sm font-medium">Prazo<span className="text-red-500"> *</span></label>
-                                <input id="projeto-deadline" type="date" value={deadline} onChange={e => setDeadline(e.target.value)} className="mt-1 w-full p-2 border border-slate-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-700" />
-                            </div>
-                            <div>
-                                <label htmlFor="projeto-status" className="block text-sm font-medium">Status</label>
-                                <select id="projeto-status" value={status} onChange={e => setStatus(e.target.value as ProjectStatus)} className="mt-1 w-full p-2 border border-slate-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-700">
-                                    {Object.entries(statusConfig).filter(([key]) => key !== 'overdue').map(([key, value]) => (
-                                        <option key={key} value={key}>{value.text}</option>
-                                    ))}
-                                </select>
-                            </div>
-                        </div>
-                        {status === 'completed' && (
-                            <div>
-                                <label htmlFor="data-entrega" className="block text-sm font-medium">Data de Entrega<span className="text-red-500"> *</span></label>
-                                <input id="data-entrega" type="date" value={dataEntrega || ''} onChange={e => setDataEntrega(e.target.value)} className="mt-1 w-full p-2 border border-slate-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-700" />
-                            </div>
-                        )}
                     </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                        <div>
+                            <label htmlFor="projeto-deadline" className="block text-sm font-medium">Prazo<span className="text-red-500"> *</span></label>
+                            <input id="projeto-deadline" type="date" value={deadline} onChange={e => setDeadline(e.target.value)} className="mt-1 w-full p-2 border border-slate-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-700" />
+                        </div>
+                        <div>
+                            <label htmlFor="projeto-status" className="block text-sm font-medium">Status</label>
+                            <select id="projeto-status" value={status} onChange={e => setStatus(e.target.value as ProjectStatus)} className="mt-1 w-full p-2 border border-slate-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-700">
+                                {Object.entries(statusConfig).filter(([key]) => key !== 'overdue').map(([key, value]) => (
+                                    <option key={key} value={key}>{value.text}</option>
+                                ))}
+                            </select>
+                        </div>
+                    </div>
+                    {status === 'completed' && (
+                        <div>
+                            <label htmlFor="data-entrega" className="block text-sm font-medium">Data de Entrega<span className="text-red-500"> *</span></label>
+                            <input id="data-entrega" type="date" value={dataEntrega || ''} onChange={e => setDataEntrega(e.target.value)} className="mt-1 w-full p-2 border border-slate-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-700" />
+                        </div>
+                    )}
                 </div>
-                <div className="bg-slate-50 dark:bg-slate-800/50 px-6 py-4 flex justify-end gap-3 rounded-b-xl">
+                <div className="bg-slate-50 dark:bg-slate-800/50 px-6 py-4 flex justify-end gap-3 rounded-b-xl border-t border-slate-200 dark:border-slate-700">
                     <button onClick={onClose} className="px-4 py-2 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-md">Cancelar</button>
                     <button onClick={handleSave} disabled={!projetistaId || !name.trim() || !deadline || !empreendimento.trim() || !contrato.trim()} className="px-4 py-2 bg-blue-600 text-white rounded-md disabled:bg-blue-400">Salvar</button>
                 </div>
@@ -375,6 +407,5 @@ const ProjetoFormModal: React.FC<{ initialData: Partial<Projeto> | null; projeti
         </div>
     );
 };
-
 
 export default ProjectControlView;

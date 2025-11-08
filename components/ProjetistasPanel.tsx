@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import type { Projetista } from '../types';
-import { BriefcaseIcon, CameraIcon, EditIcon, PlusIcon, TrashIcon } from './icons';
+import { BriefcaseIcon, CameraIcon, EditIcon, PlusIcon, TrashIcon, XIcon } from './icons';
 import ConfirmationDialog from './ConfirmationDialog';
 
 const ProjetistaFormModal: React.FC<{ 
@@ -25,30 +25,33 @@ const ProjetistaFormModal: React.FC<{
     };
 
     return (
-        <div className="fixed inset-0 bg-black bg-opacity-60 z-50 flex items-center justify-center p-4" onClick={onClose}>
-            <div className="bg-white dark:bg-slate-800 rounded-xl shadow-2xl w-full max-w-md" onClick={e => e.stopPropagation()}>
-                <div className="p-6">
+        <div className="fixed inset-0 bg-black bg-opacity-60 z-50 flex items-center justify-center p-4">
+            <div className="bg-white dark:bg-slate-800 rounded-xl shadow-2xl w-full max-w-md flex flex-col max-h-[90vh]" onClick={e => e.stopPropagation()}>
+                <div className="flex justify-between items-center p-4 border-b border-slate-200 dark:border-slate-700">
                     <h3 className="text-lg font-bold text-slate-900 dark:text-slate-100">{initialData ? 'Editar' : 'Adicionar'} Empresa Projetista</h3>
-                    <div className="mt-4 space-y-4">
-                        <div>
-                            <label htmlFor="projetista-name" className="block text-sm font-medium text-slate-600 dark:text-slate-300">Nome da Empresa</label>
-                            <input id="projetista-name" type="text" value={name} onChange={e => setName(e.target.value)} className="mt-1 w-full p-2 border border-slate-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-700" />
+                    <button onClick={onClose} className="p-1 rounded-full text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700">
+                        <XIcon className="w-5 h-5" />
+                    </button>
+                </div>
+                <div className="p-6 space-y-4 overflow-y-auto">
+                    <div>
+                        <label htmlFor="projetista-name" className="block text-sm font-medium text-slate-600 dark:text-slate-300">Nome da Empresa</label>
+                        <input id="projetista-name" type="text" value={name} onChange={e => setName(e.target.value)} className="mt-1 w-full p-2 border border-slate-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-700" />
+                    </div>
+                    <div className="flex items-center gap-4">
+                        <div className="w-20 h-20 bg-slate-100 dark:bg-slate-700 rounded-full flex items-center justify-center overflow-hidden">
+                            {logo ? <img src={logo} alt="Logo" className="w-full h-full object-contain" /> : <CameraIcon className="w-8 h-8 text-slate-400" />}
                         </div>
-                        <div className="flex items-center gap-4">
-                            <div className="w-20 h-20 bg-slate-100 dark:bg-slate-700 rounded-full flex items-center justify-center overflow-hidden">
-                                {logo ? <img src={logo} alt="Logo" className="w-full h-full object-contain" /> : <CameraIcon className="w-8 h-8 text-slate-400" />}
-                            </div>
-                            <div>
-                                <label htmlFor="logo-upload" className="cursor-pointer inline-flex items-center px-3 py-2 text-sm border border-slate-300 dark:border-slate-600 rounded-md">
-                                    <CameraIcon className="w-4 h-4 mr-2" /> Carregar Logo
-                                </label>
-                                <input id="logo-upload" type="file" accept="image/*" className="hidden" onChange={handleLogoChange} />
-                                {logo && <button onClick={() => setLogo(null)} className="ml-2 text-xs text-red-500">Remover</button>}
-                            </div>
+                        <div>
+                            <label htmlFor="logo-upload" className="cursor-pointer inline-flex items-center px-3 py-2 text-sm border border-slate-300 dark:border-slate-600 rounded-md">
+                                <CameraIcon className="w-4 h-4 mr-2" /> Carregar Logo
+                            </label>
+                            <input id="logo-upload" type="file" accept="image/*" className="hidden" onChange={handleLogoChange} />
+                            {logo && <button onClick={() => setLogo(null)} className="ml-2 text-xs text-red-500">Remover</button>}
                         </div>
                     </div>
                 </div>
-                <div className="bg-slate-50 dark:bg-slate-800/50 px-6 py-4 flex justify-end gap-3 rounded-b-xl">
+                <div className="bg-slate-50 dark:bg-slate-800/50 px-6 py-4 flex justify-end gap-3 rounded-b-xl border-t border-slate-200 dark:border-slate-700">
                     <button onClick={onClose} className="px-4 py-2 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-md">Cancelar</button>
                     <button onClick={handleSave} disabled={!name.trim()} className="px-4 py-2 bg-blue-600 text-white rounded-md disabled:bg-blue-400">Salvar</button>
                 </div>

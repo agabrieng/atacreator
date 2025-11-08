@@ -64,6 +64,11 @@ export interface Empreendimento {
   id: string;
   name: string;
   contrato: string;
+  local: string; // "Cidade - UF"
+  gestor?: string;
+  liderTecnico?: string;
+  planejador?: string;
+  engenheiroResidente?: string;
 }
 
 // --- Types for Deadline Panel ---
@@ -130,4 +135,16 @@ export interface Projeto {
   disciplina: Disciplina;
   taxonomia: string;
   dataEntrega?: string | null; // Stored as YYYY-MM-DD
+}
+
+// --- Types for IBGE API ---
+export interface IbgeState {
+  id: number;
+  sigla: string;
+  nome: string;
+}
+
+export interface IbgeCity {
+  id: number;
+  nome: string;
 }

@@ -25,7 +25,7 @@ import MinutesDisplay from './components/MinutesDisplay';
 import Loader from './components/Loader';
 import ConfirmationDialog from './components/ConfirmationDialog';
 import SavedAtasPanel from './components/SavedAtasPanel';
-import ProjectManagementPanel from './components/ProjectManagementPanel';
+import EmpreendimentosPanel from './components/EmpreendimentosPanel';
 import DeadlinePanel from './components/DeadlinePanel';
 import WebhookPanel from './components/WebhookPanel';
 import Sidebar from './components/Sidebar';
@@ -110,7 +110,8 @@ const AtaCreatorView: React.FC<{
     companyProfiles: Record<string, AdminSettings>;
     currentCompanyName: string;
     setToast: (toast: { message: string; type: 'success' | 'error' } | null) => void;
-}> = ({ initialAta, onAtaViewed, companyProfiles, currentCompanyName, setToast }) => {
+    empreendimentos: Empreendimento[];
+}> = ({ initialAta, onAtaViewed, companyProfiles, currentCompanyName, setToast, empreendimentos }) => {
   
   const adminSettings = companyProfiles[currentCompanyName] || null;
 
@@ -139,11 +140,6 @@ const AtaCreatorView: React.FC<{
   const [isExportReady, setIsExportReady] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
-
-  // State for Projects (Empreendimentos)
-  const [empreendimentos, setEmpreendimentos] = useState<Empreendimento[]>([]);
-  const [isProjectsLoading, setIsProjectsLoading] = useState(true);
-  const [isProjectPanelOpen, setIsProjectPanelOpen] = useState(false);
   
   // State for collapsible form
   const [isFormCollapsed, setIsFormCollapsed] = useState(false);
@@ -157,24 +153,6 @@ const AtaCreatorView: React.FC<{
     // Compare current ata with the last saved/loaded state.
     return JSON.stringify(ata) !== JSON.stringify(originalLoadedAta);
   }, [ata, originalLoadedAta]);
-
-  useEffect(() => {
-    // Load empreendimentos from Firebase
-    const fetchEmpreendimentos = async () => {
-        try {
-            setIsProjectsLoading(true);
-            const loadedEmpreendimentos = await getEmpreendimentos();
-            setEmpreendimentos(loadedEmpreendimentos);
-        } catch (error: any) {
-            console.error("Failed to load empreendimentos from Firebase", error);
-            setError(`Falha ao carregar a lista de empreendimentos: ${error.message}`);
-        } finally {
-            setIsProjectsLoading(false);
-        }
-    };
-    
-    fetchEmpreendimentos();
-  }, []);
   
     useEffect(() => {
         const checkLibs = () => {
@@ -192,21 +170,20 @@ const AtaCreatorView: React.FC<{
     useEffect(() => {
         const selectedProject = empreendimentos.find(p => p.name === empreendimento);
         if (selectedProject) {
-            const newContrato = selectedProject.contrato;
-            setContrato(newContrato);
+            setContrato(selectedProject.contrato);
+            setLocal(selectedProject.local);
     
             // Auto-fill other header data from localStorage cache if available
-            if (newContrato) {
+            if (selectedProject.contrato) {
                 try {
                     const savedHeadersStr = localStorage.getItem('ata-header-data');
                     if (savedHeadersStr) {
                         const savedHeaders = JSON.parse(savedHeadersStr);
-                        const data = savedHeaders[newContrato];
+                        const data = savedHeaders[selectedProject.contrato];
                         if (data) {
                             setArea(data.area || '');
                             setTitulo(data.titulo || '');
                             setAssunto(data.assunto || '');
-                            setLocal(data.local || '');
                         }
                     }
                 } catch (err) {
@@ -241,49 +218,6 @@ const AtaCreatorView: React.FC<{
     }, [initialAta, onAtaViewed, handleSelectSavedAta]);
 
   
-  // --- Project Management Handlers ---
-  const handleAddProject = async (name: string, contrato: string) => {
-    try {
-        const newId = await addEmpreendimento(name, contrato);
-        const newProject = { id: newId, name, contrato };
-        setEmpreendimentos(prev => [...prev, newProject].sort((a, b) => a.name.localeCompare(b.name)));
-        setToast({ message: 'Empreendimento adicionado!', type: 'success' });
-    } catch (error: any) {
-        console.error("Failed to add project:", error);
-        setToast({ message: `Falha ao adicionar empreendimento: ${error.message}`, type: 'error' });
-    }
-  };
-
-  const handleUpdateProject = async (id: string, newName: string, newContrato: string) => {
-    try {
-        await updateEmpreendimento(id, newName, newContrato);
-        setEmpreendimentos(prev => prev.map(p => p.id === id ? { ...p, name: newName, contrato: newContrato } : p).sort((a, b) => a.name.localeCompare(b.name)));
-        setToast({ message: 'Empreendimento atualizado!', type: 'success' });
-    } catch (error: any) {
-        console.error("Failed to update project:", error);
-        setToast({ message: `Falha ao atualizar empreendimento: ${error.message}`, type: 'error' });
-    }
-  };
-  
-  const handleDeleteProject = async (id: string) => {
-    try {
-        const projectToDelete = empreendimentos.find(p => p.id === id);
-        if (!projectToDelete) return;
-
-        await deleteEmpreendimento(id);
-        
-        setEmpreendimentos(prev => prev.filter(p => p.id !== id));
-
-        if (empreendimento === projectToDelete.name) {
-            setEmpreendimento('');
-        }
-        setToast({ message: 'Empreendimento excluído!', type: 'success' });
-    } catch (error: any) {
-        console.error("Failed to delete project:", error);
-        setToast({ message: `Falha ao excluir empreendimento: ${error.message}`, type: 'error' });
-    }
-  };
-
   const handleGenerate = useCallback(async () => {
     if (!adminSettings) {
       setError("As configurações da empresa não foram carregadas. Por favor, verifique as configurações e selecione uma empresa.");
@@ -483,8 +417,6 @@ const AtaCreatorView: React.FC<{
                 <InputForm
                     empreendimento={empreendimento} setEmpreendimento={setEmpreendimento}
                     empreendimentos={empreendimentos}
-                    isProjectsLoading={isProjectsLoading}
-                    onOpenProjectPanel={() => setIsProjectPanelOpen(true)}
                     area={area} setArea={setArea}
                     titulo={titulo} setTitulo={setTitulo}
                     assunto={assunto} setAssunto={setAssunto}
@@ -570,14 +502,6 @@ const AtaCreatorView: React.FC<{
           </div>
         </div>
       </main>
-       <ProjectManagementPanel
-        isOpen={isProjectPanelOpen}
-        onClose={() => setIsProjectPanelOpen(false)}
-        projects={empreendimentos}
-        onAdd={handleAddProject}
-        onUpdate={handleUpdateProject}
-        onDelete={handleDeleteProject}
-      />
       <ConfirmationDialog
         isOpen={showClearConfirmation}
         onClose={() => setShowClearConfirmation(false)}
@@ -652,8 +576,17 @@ const SettingsView: React.FC<{
     onAddProjetista: (name: string, logo: string | null) => Promise<void>;
     onUpdateProjetista: (id: string, name: string, logo: string | null) => Promise<void>;
     onDeleteProjetista: (id: string) => Promise<void>;
-}> = ({ allProfiles, currentCompanyName, onSave, setToast, webhooks, onAddWebhook, onUpdateWebhook, onDeleteWebhook, projetistas, onAddProjetista, onUpdateProjetista, onDeleteProjetista }) => {
-    const [activeTab, setActiveTab] = useState<'profiles' | 'webhooks' | 'projetistas'>('profiles');
+    empreendimentos: Empreendimento[];
+    onAddEmpreendimento: (data: Omit<Empreendimento, 'id'>) => Promise<void>;
+    onUpdateEmpreendimento: (id: string, data: Partial<Omit<Empreendimento, 'id'>>) => Promise<void>;
+    onDeleteEmpreendimento: (id: string) => Promise<void>;
+}> = ({ 
+    allProfiles, currentCompanyName, onSave, setToast, 
+    webhooks, onAddWebhook, onUpdateWebhook, onDeleteWebhook, 
+    projetistas, onAddProjetista, onUpdateProjetista, onDeleteProjetista,
+    empreendimentos, onAddEmpreendimento, onUpdateEmpreendimento, onDeleteEmpreendimento
+}) => {
+    const [activeTab, setActiveTab] = useState<'profiles' | 'empreendimentos' | 'projetistas' | 'webhooks'>('profiles');
 
     const handleSaveWithToast = (profiles: Record<string, AdminSettings>, currentCompany: string) => {
         onSave(profiles, currentCompany);
@@ -681,6 +614,16 @@ const SettingsView: React.FC<{
                         }`}
                     >
                         Perfis de Empresa
+                    </button>
+                    <button
+                        onClick={() => setActiveTab('empreendimentos')}
+                        className={`whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm ${
+                            activeTab === 'empreendimentos'
+                            ? 'border-blue-500 text-blue-600 dark:text-blue-400'
+                            : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300 dark:text-slate-400 dark:hover:text-slate-300 dark:hover:border-slate-600'
+                        }`}
+                    >
+                        Empreendimentos
                     </button>
                     <button
                         onClick={() => setActiveTab('projetistas')}
@@ -711,6 +654,15 @@ const SettingsView: React.FC<{
                         allProfiles={allProfiles} 
                         currentCompanyName={currentCompanyName} 
                         onSave={handleSaveWithToast}
+                    />
+                 )}
+                  {activeTab === 'empreendimentos' && (
+                    <EmpreendimentosPanel
+                        empreendimentos={empreendimentos}
+                        onAdd={onAddEmpreendimento}
+                        onUpdate={onUpdateEmpreendimento}
+                        onDelete={onDeleteEmpreendimento}
+                        setToast={setToast}
                     />
                  )}
                  {activeTab === 'projetistas' && (
@@ -748,11 +700,12 @@ const App: React.FC = () => {
 
   const [ataToView, setAtaToView] = useState<AtaData | null>(null);
   
-  // State lifted from AtaCreatorView
+  // State lifted to App
   const [companyProfiles, setCompanyProfiles] = useState<Record<string, AdminSettings>>({});
   const [currentCompanyName, setCurrentCompanyName] = useState<string>('');
   const [webhooks, setWebhooks] = useState<Webhook[]>([]);
   const [projetistas, setProjetistas] = useState<Projetista[]>([]);
+  const [empreendimentos, setEmpreendimentos] = useState<Empreendimento[]>([]);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
   useEffect(() => {
@@ -782,12 +735,14 @@ const App: React.FC = () => {
     
     const fetchData = async () => {
         try {
-            const [loadedWebhooks, loadedProjetistas] = await Promise.all([
+            const [loadedWebhooks, loadedProjetistas, loadedEmpreendimentos] = await Promise.all([
                 getWebhooks(),
-                getProjetistas()
+                getProjetistas(),
+                getEmpreendimentos()
             ]);
             setWebhooks(loadedWebhooks);
             setProjetistas(loadedProjetistas);
+            setEmpreendimentos(loadedEmpreendimentos);
         } catch (error: any) {
             console.error("Failed to load initial data from Firebase", error);
             setToast({ message: `Falha ao carregar dados iniciais: ${error.message}`, type: 'error' });
@@ -810,6 +765,41 @@ const App: React.FC = () => {
     localStorage.setItem('ata-company-profiles', JSON.stringify(profiles));
     localStorage.setItem('ata-current-company-name', currentCompany);
   }, []);
+
+  // --- Empreendimento Handlers ---
+  const handleAddEmpreendimento = async (data: Omit<Empreendimento, 'id'>) => {
+    try {
+        const newId = await addEmpreendimento(data);
+        const newEmpreendimento = { id: newId, ...data };
+        setEmpreendimentos(prev => [...prev, newEmpreendimento].sort((a, b) => a.name.localeCompare(b.name)));
+    } catch (error: any) {
+        console.error("Failed to add empreendimento:", error);
+        setToast({ message: `Falha ao adicionar empreendimento: ${error.message}`, type: 'error' });
+        throw error; // Re-throw to be caught in the panel
+    }
+  };
+
+  const handleUpdateEmpreendimento = async (id: string, data: Partial<Omit<Empreendimento, 'id'>>) => {
+    try {
+        await updateEmpreendimento(id, data);
+        setEmpreendimentos(prev => prev.map(p => p.id === id ? { ...p, ...data } : p).sort((a, b) => a.name.localeCompare(b.name)));
+    } catch (error: any) {
+        console.error("Failed to update empreendimento:", error);
+        setToast({ message: `Falha ao atualizar empreendimento: ${error.message}`, type: 'error' });
+        throw error; // Re-throw to be caught in the panel
+    }
+  };
+  
+  const handleDeleteEmpreendimento = async (id: string) => {
+    try {
+        await deleteEmpreendimento(id);
+        setEmpreendimentos(prev => prev.filter(p => p.id !== id));
+    } catch (error: any) {
+        console.error("Failed to delete empreendimento:", error);
+        setToast({ message: `Falha ao excluir empreendimento: ${error.message}`, type: 'error' });
+        throw error; // Re-throw to be caught in the panel
+    }
+  };
   
   // --- Webhook Handlers ---
   const handleAddWebhook = async (name: string, url: string) => {
@@ -912,10 +902,10 @@ const App: React.FC = () => {
       <div className={`flex-1 w-full transition-all duration-300 ease-in-out ${isSidebarCollapsed ? 'pl-20' : 'pl-64'}`}>
         {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
         {currentView === 'dashboard' && <Dashboard />}
-        {currentView === 'ataCreator' && <AtaCreatorView initialAta={ataToView} onAtaViewed={handleAtaViewed} companyProfiles={companyProfiles} currentCompanyName={currentCompanyName} setToast={setToast} />}
+        {currentView === 'ataCreator' && <AtaCreatorView initialAta={ataToView} onAtaViewed={handleAtaViewed} companyProfiles={companyProfiles} currentCompanyName={currentCompanyName} setToast={setToast} empreendimentos={empreendimentos} />}
         {currentView === 'ataRepository' && <AtaRepositoryView onNavigateToAta={handleNavigateToAta} />}
         {currentView === 'deadlinePanel' && <DeadlineView onNavigateToAta={handleNavigateToAta} adminSettings={adminSettings} webhooks={webhooks} />}
-        {currentView === 'projectControl' && <ProjectControlView setToast={setToast} projetistas={projetistas} />}
+        {currentView === 'projectControl' && <ProjectControlView setToast={setToast} projetistas={projetistas} empreendimentos={empreendimentos} />}
         {currentView === 'projectDashboard' && <ProjectDashboardView />}
         {currentView === 'settings' && <SettingsView 
             allProfiles={companyProfiles} 
@@ -930,6 +920,10 @@ const App: React.FC = () => {
             onAddProjetista={handleAddProjetista}
             onUpdateProjetista={handleUpdateProjetista}
             onDeleteProjetista={handleDeleteProjetista}
+            empreendimentos={empreendimentos}
+            onAddEmpreendimento={handleAddEmpreendimento}
+            onUpdateEmpreendimento={handleUpdateEmpreendimento}
+            onDeleteEmpreendimento={handleDeleteEmpreendimento}
         />}
       </div>
     </div>

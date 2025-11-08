@@ -59,19 +59,19 @@ export const getEmpreendimentos = async (): Promise<Empreendimento[]> => {
   }
 };
 
-export const addEmpreendimento = async (name: string, contrato: string): Promise<string> => {
+export const addEmpreendimento = async (data: Omit<Empreendimento, 'id'>): Promise<string> => {
   try {
-    const docRef = await addDoc(empreendimentosCollectionRef, { name, contrato });
+    const docRef = await addDoc(empreendimentosCollectionRef, data);
     return docRef.id;
   } catch (error) {
     throw handleFirebaseError(error, "adicionar empreendimento");
   }
 };
 
-export const updateEmpreendimento = async (id: string, name: string, contrato: string): Promise<void> => {
+export const updateEmpreendimento = async (id: string, data: Partial<Omit<Empreendimento, 'id'>>): Promise<void> => {
   try {
     const empreendimentoDoc = doc(db, 'empreendimentos', id);
-    await updateDoc(empreendimentoDoc, { name, contrato });
+    await updateDoc(empreendimentoDoc, data);
   } catch (error) {
     throw handleFirebaseError(error, "atualizar empreendimento");
   }

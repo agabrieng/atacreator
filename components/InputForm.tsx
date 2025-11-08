@@ -8,8 +8,6 @@ interface InputFormProps {
   empreendimento: string;
   setEmpreendimento: (value: string) => void;
   empreendimentos: Empreendimento[];
-  isProjectsLoading: boolean;
-  onOpenProjectPanel: () => void;
   area: string;
   setArea: (value: string) => void;
   titulo: string;
@@ -154,19 +152,17 @@ const InputForm: React.FC<InputFormProps> = (props) => {
                     value={props.empreendimento}
                     onChange={(e) => props.setEmpreendimento(e.target.value)}
                     className="block w-full px-3 py-2 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 disabled:opacity-75"
-                    disabled={props.isProjectsLoading}
+                    disabled={props.empreendimentos.length === 0}
                 >
-                    <option value="">{props.isProjectsLoading ? 'Carregando...' : 'Selecione um empreendimento'}</option>
+                    <option value="">{props.empreendimentos.length === 0 ? 'Nenhum cadastrado' : 'Selecione um empreendimento'}</option>
                     {props.empreendimentos.map((proj) => (
                         <option key={proj.id} value={proj.name}>
                         {proj.name}
                         </option>
                     ))}
                 </select>
-                <button type="button" onClick={props.onOpenProjectPanel} title="Gerenciar Empreendimentos" className="p-2.5 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 rounded-md border border-slate-300 dark:border-slate-600">
-                    <EditIcon className="w-5 h-5 text-slate-600 dark:text-slate-300" />
-                </button>
             </div>
+             <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Gerencie os empreendimentos na tela de Configurações.</p>
         </div>
         <FormInput label="Área" id="area" value={props.area} onChange={(e) => props.setArea(e.target.value)} placeholder="Departamento ou setor responsável" />
         <FormInput label="Título do Documento" id="titulo" value={props.titulo} onChange={(e) => props.setTitulo(e.target.value)} placeholder="Ex: ATA DE REUNIÃO" />
