@@ -111,25 +111,16 @@ const ProjectStatusPieChart: React.FC<{ projects: Projeto[] }> = React.memo(({ p
 
 
 const ProjectsByCompanyChart: React.FC<{ projects: Projeto[]; projetistas: Projetista[] }> = React.memo(({ projects, projetistas }) => {
-    const statusOrder: ProjectStatus[] = ['completed', 'in-progress', 'pending', 'overdue'];
-    const statusColors: Record<ProjectStatus, string> = { completed: '#10b981', 'in-progress': '#3b82f6', pending: '#64748b', overdue: '#ef4444' };
-    
     const data = useMemo(() => {
-        // Fix: Add explicit type to `p` to fix inference error.
         const projetistaMap = new Map(projetistas.map((p: Projetista) => [p.id, p.name]));
-        const counts = new Map<string, Record<ProjectStatus, number>>();
+        const counts = new Map<string, number>();
 
-        // Fix: Add explicit type to `proj` to fix inference error.
         projects.forEach((proj: Projeto) => {
             const name = projetistaMap.get(proj.projetistaId) || 'Desconhecida';
-            if (!counts.has(name)) {
-                counts.set(name, { completed: 0, overdue: 0, 'in-progress': 0, pending: 0 });
-            }
-            const currentStatus = getStatusWithOverdueCheck(proj.status, proj.deadline);
-            counts.get(name)![currentStatus]++;
+            counts.set(name, (counts.get(name) || 0) + 1);
         });
 
-        return Array.from(counts.entries()).map(([name, statuses]) => ({ name, ...statuses, total: Object.values(statuses).reduce((a, b) => a + b, 0) })).sort((a,b) => b.total - a.total);
+        return Array.from(counts.entries()).map(([name, total]) => ({ name, total })).sort((a,b) => b.total - a.total);
     }, [projects, projetistas]);
 
     const maxValue = Math.max(...data.map(d => d.total), 0);
@@ -139,13 +130,15 @@ const ProjectsByCompanyChart: React.FC<{ projects: Projeto[]; projetistas: Proje
             <h3 className="text-lg font-semibold text-slate-800 dark:text-slate-200 mb-4">Projetos por Empresa</h3>
             <div className="space-y-4">
                 {data.length > 0 ? data.map(item => (
-                    <div key={item.name}>
-                        <div className="flex justify-between items-center mb-1"><span className="text-sm font-medium">{item.name}</span><span className="text-sm font-bold">{item.total}</span></div>
-                        <div className="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-4 flex overflow-hidden">
-                            {statusOrder.map(status => item[status] > 0 && (
-                                <div key={status} className="h-4" style={{ width: `${(item[status] / item.total) * 100}%`, backgroundColor: statusColors[status] }} title={`${status.replace('-', ' ')}: ${item[status]}`}></div>
-                            ))}
+                    <div key={item.name} className="grid grid-cols-[auto,1fr,auto] gap-3 items-center">
+                        <span className="text-sm font-medium text-slate-600 dark:text-slate-300">{item.name}</span>
+                        <div className="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-3.5">
+                            <div
+                                className="bg-blue-500 h-3.5 rounded-full"
+                                style={{ width: `${maxValue > 0 ? (item.total / maxValue) * 100 : 0}%` }}
+                            ></div>
                         </div>
+                        <span className="text-sm font-bold text-slate-800 dark:text-slate-200">{item.total}</span>
                     </div>
                 )) : <p className="text-sm text-center text-slate-500 py-8">Nenhum projeto para exibir.</p>}
             </div>
@@ -189,44 +182,61 @@ const UpcomingDeadlinesList: React.FC<{ projects: Projeto[]; projetistas: Projet
     );
 });
 
-const ProjectDeadlineTrendChart: React.FC<{ projects: Projeto[] }> = React.memo(({ projects }) => {
-    const { data, empreendimentos, maxCount } = useMemo(() => {
-        if (projects.length === 0) {
-            return { data: [], empreendimentos: [], maxCount: 5 };
+const ProjectDeadlineTrendChart: React.FC<{ projects: Projeto[]; projetistas: Projetista[] }> = React.memo(({ projects, projetistas }) => {
+    const [selectedEmpreendimento, setSelectedEmpreendimento] = useState<string>('');
+    const containerRef = useRef<HTMLDivElement>(null);
+    const [tooltip, setTooltip] = useState<{ x: number; y: number; content: ReactNode } | null>(null);
+
+    const uniqueEmpreendimentos = useMemo(() => {
+        const empreendimentoSet = new Set<string>();
+        projects.forEach(p => {
+            if (p.empreendimento) empreendimentoSet.add(p.empreendimento);
+        });
+        return Array.from(empreendimentoSet).sort();
+    }, [projects]);
+
+    useEffect(() => {
+        if (uniqueEmpreendimentos.length > 0 && !selectedEmpreendimento) {
+            setSelectedEmpreendimento(uniqueEmpreendimentos[0]);
+        }
+    }, [uniqueEmpreendimentos, selectedEmpreendimento]);
+
+    const { data, involvedProjetistas, maxCount, projetistaMap } = useMemo(() => {
+        if (!selectedEmpreendimento || projects.length === 0 || projetistas.length === 0) {
+            return { data: [], involvedProjetistas: [], maxCount: 5, projetistaMap: new Map() };
         }
 
-        const validProjects = projects.filter(p => p.deadline && !isNaN(new Date(p.deadline).getTime()));
-        if (validProjects.length === 0) {
-            return { data: [], empreendimentos: [], maxCount: 5 };
-        }
+        const localProjetistaMap = new Map(projetistas.map(p => [p.id, p.name]));
 
-        const dates = validProjects.map(p => new Date(p.deadline));
+        const filteredProjects = projects.filter(p => p.empreendimento === selectedEmpreendimento && p.deadline && !isNaN(new Date(p.deadline).getTime()));
+        if (filteredProjects.length === 0) {
+            return { data: [], involvedProjetistas: [], maxCount: 5, projetistaMap: localProjetistaMap };
+        }
+        
+        const dates = filteredProjects.map(p => new Date(p.deadline));
         const minDate = new Date(Math.min(...dates.map(d => d.getTime())));
         const maxDate = new Date(Math.max(...dates.map(d => d.getTime())));
 
-        const startYear = minDate.getUTCFullYear();
-        const startMonth = minDate.getUTCMonth();
-        
-        const monthlyData: Record<string, Record<string, number>> = {}; // key: 'YYYY-MM'
-        const empreendimentoSet = new Set<string>();
+        const monthlyData: Record<string, Record<string, number>> = {}; // key: 'YYYY-MM', value: { projetistaId: count }
+        const projetistaSet = new Set<string>();
 
-        validProjects.forEach(p => {
+        filteredProjects.forEach(p => {
             const deadlineDate = new Date(p.deadline);
             const year = deadlineDate.getUTCFullYear();
             const month = deadlineDate.getUTCMonth();
             const key = `${year}-${month}`;
             
-            const empreendimento = p.empreendimento || 'Não Especificado';
-            empreendimentoSet.add(empreendimento);
+            const projetistaId = p.projetistaId;
+            projetistaSet.add(projetistaId);
 
             if (!monthlyData[key]) monthlyData[key] = {};
-            monthlyData[key][empreendimento] = (monthlyData[key][empreendimento] || 0) + 1;
+            monthlyData[key][projetistaId] = (monthlyData[key][projetistaId] || 0) + 1;
         });
         
-        const empreendimentoList = Array.from(empreendimentoSet);
+        const involvedProjetistaList = Array.from(projetistaSet);
         
         const labels: { year: number, month: number, label: string }[] = [];
-        let currentDate = new Date(Date.UTC(startYear, startMonth, 1));
+        let currentDate = new Date(Date.UTC(minDate.getUTCFullYear(), minDate.getUTCMonth(), 1));
         const lastDate = new Date(Date.UTC(maxDate.getUTCFullYear(), maxDate.getUTCMonth(), 1));
 
         while(currentDate <= lastDate) {
@@ -241,28 +251,86 @@ const ProjectDeadlineTrendChart: React.FC<{ projects: Projeto[] }> = React.memo(
             const key = `${year}-${month}`;
             const entry: any = { month: label };
             const monthlyCounts = monthlyData[key] || {};
-            empreendimentoList.forEach(emp => {
-                entry[emp] = monthlyCounts[emp] || 0;
+            involvedProjetistaList.forEach(projId => {
+                entry[projId] = monthlyCounts[projId] || 0;
             });
             return entry;
         });
 
-        const allCounts = chartData.flatMap(d => empreendimentoList.map(emp => d[emp]));
+        const allCounts = chartData.flatMap(d => involvedProjetistaList.map(projId => d[projId]));
         const currentMaxCount = Math.max(0, ...allCounts);
         const maxCount = Math.max(5, Math.ceil(currentMaxCount / 5) * 5);
 
-        return { data: chartData, empreendimentos: empreendimentoList, maxCount };
-    }, [projects]);
+        return { data: chartData, involvedProjetistas: involvedProjetistaList, maxCount, projetistaMap: localProjetistaMap };
+    }, [projects, projetistas, selectedEmpreendimento]);
     
     const colors = ['#3b82f6', '#10b981', '#f97316', '#8b5cf6', '#ec4899', '#64748b', '#ef4444'];
-    const [tooltip, setTooltip] = useState<{ x: number; y: number; content: ReactNode } | null>(null);
-    const containerRef = useRef<HTMLDivElement>(null);
+    
+    const todayLineX = useMemo(() => {
+        if (data.length < 2) return null;
 
-    const getPath = (empreendimento: string, width: number, height: number) => {
+        const today = new Date();
+
+        const parseLabel = (label: string): { month: number; year: number } | null => {
+            const monthMap: Record<string, number> = { jan: 0, fev: 1, mar: 2, abr: 3, mai: 4, jun: 5, jul: 6, ago: 7, set: 8, out: 9, nov: 10, dez: 11 };
+            const parts = label.split('/');
+            if (parts.length !== 2) return null;
+            const monthStr = parts[0].toLowerCase().substring(0, 3);
+            const yearStr = parts[1];
+            const month = monthMap[monthStr];
+            if (month === undefined || isNaN(parseInt(yearStr))) return null;
+            const year = 2000 + parseInt(yearStr);
+            return { month, year };
+        };
+
+        const firstLabelParsed = parseLabel(data[0].month);
+        const lastLabelParsed = parseLabel(data[data.length - 1].month);
+        if (!firstLabelParsed || !lastLabelParsed) return null;
+
+        const chartStartDate = new Date(Date.UTC(firstLabelParsed.year, firstLabelParsed.month, 1));
+        const chartEndDate = new Date(Date.UTC(lastLabelParsed.year, lastLabelParsed.month, 1));
+
+        const endOfRange = new Date(chartEndDate);
+        endOfRange.setUTCMonth(endOfRange.getUTCMonth() + 1);
+
+        if (today < chartStartDate || today >= endOfRange) {
+            return null;
+        }
+
+        const totalTimespan = chartEndDate.getTime() - chartStartDate.getTime();
+        if (totalTimespan < 0) return null;
+
+        if (totalTimespan === 0) {
+            const singleMonthDate = chartStartDate;
+            const endOfSingleMonth = new Date(singleMonthDate);
+            endOfSingleMonth.setUTCMonth(endOfSingleMonth.getUTCMonth() + 1);
+            if (today >= singleMonthDate && today < endOfSingleMonth) {
+                const totalDays = new Date(today.getUTCFullYear(), today.getUTCMonth() + 1, 0).getUTCDate();
+                const dayRatio = (today.getUTCDate() - 1) / totalDays;
+                const middleX = (395 + 30) / 2;
+                const spread = 50;
+                return middleX - (spread / 2) + (dayRatio * spread);
+            }
+            return null;
+        }
+
+        const todayOffset = today.getTime() - chartStartDate.getTime();
+        const todayRatio = todayOffset / totalTimespan;
+        
+        const startX = 30;
+        const endX = 395;
+        const plotAreaWidth = endX - startX;
+        const xPosition = todayRatio * plotAreaWidth + startX;
+
+        return xPosition;
+    }, [data]);
+
+
+    const getPath = (projetistaId: string, width: number, height: number) => {
         let path = '';
         data.forEach((d, i) => {
-            const x = data.length > 1 ? (i / (data.length - 1)) * (width - 35) + 30 : width / 2;
-            const y = height - 20 - (d[empreendimento] / maxCount) * (height - 40);
+            const x = data.length > 1 ? (i / (data.length - 1)) * (width - 65) + 30 : width / 2;
+            const y = height - 20 - ((d[projetistaId] || 0) / maxCount) * (height - 40);
             path += `${i === 0 ? 'M' : 'L'}${x},${y} `;
         });
         return path;
@@ -270,11 +338,22 @@ const ProjectDeadlineTrendChart: React.FC<{ projects: Projeto[] }> = React.memo(
 
     return (
         <div className="bg-white dark:bg-slate-800 pt-6 pb-6 rounded-xl shadow-lg border border-slate-200 dark:border-slate-700">
-            <h3 className="text-lg font-semibold text-slate-800 dark:text-slate-200 mb-4 flex items-center px-6">
-                <TrendingUpIcon className="w-5 h-5 mr-2 text-slate-500"/>
-                Cronograma de Prazos por Empreendimento
-            </h3>
-            {empreendimentos.length > 0 ? (
+            <div className="flex justify-between items-center px-6 mb-4">
+                <h3 className="text-lg font-semibold text-slate-800 dark:text-slate-200 flex items-center">
+                    <TrendingUpIcon className="w-5 h-5 mr-2 text-slate-500"/>
+                    Cronograma de Prazos por Empreendimento
+                </h3>
+                {uniqueEmpreendimentos.length > 1 && (
+                    <select
+                        value={selectedEmpreendimento}
+                        onChange={e => setSelectedEmpreendimento(e.target.value)}
+                        className="text-sm px-3 py-1 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                    >
+                        {uniqueEmpreendimentos.map(emp => <option key={emp} value={emp}>{emp}</option>)}
+                    </select>
+                )}
+            </div>
+            {involvedProjetistas.length > 0 ? (
                 <>
                 <div className="relative h-64" ref={containerRef}>
                     <svg width="100%" height="100%" viewBox="0 0 400 300" preserveAspectRatio="xMidYMid meet">
@@ -294,33 +373,61 @@ const ProjectDeadlineTrendChart: React.FC<{ projects: Projeto[] }> = React.memo(
                                 <text key={i} x={x} y="295" textAnchor="middle" fill="currentColor" className="text-xs text-slate-500 dark:text-slate-400 capitalize">{d.month}</text>
                              );
                         })}
+                        {/* Today Line */}
+                        {todayLineX !== null && (
+                            <line
+                                x1={todayLineX}
+                                y1="20"
+                                x2={todayLineX}
+                                y2="280"
+                                stroke="red"
+                                strokeWidth="1"
+                            />
+                        )}
                         {/* Lines */}
-                        {empreendimentos.map((emp, empIndex) => (
-                             <path key={emp} d={getPath(emp, 400, 300)} fill="none" stroke={colors[empIndex % colors.length]} strokeWidth="2" />
+                        {involvedProjetistas.map((projId, projIndex) => (
+                             <path key={projId} d={getPath(projId, 400, 300)} fill="none" stroke={colors[projIndex % colors.length]} strokeWidth="2" />
                         ))}
-                        {/* Circles & Tooltips */}
-                         {empreendimentos.map((emp, empIndex) => 
+                        {/* Circles, Tooltips & Data Labels */}
+                        {involvedProjetistas.map((projId, projIndex) => 
                             data.map((d, i) => {
-                                const x = data.length > 1 ? (i / (data.length - 1)) * (400 - 35) + 30 : 400 / 2;
-                                const y = 300 - 20 - (d[emp] / maxCount) * (300 - 40);
+                                const x = data.length > 1 ? (i / (data.length - 1)) * (400 - 65) + 30 : 400 / 2;
+                                const y = 300 - 20 - ((d[projId] || 0) / maxCount) * (300 - 40);
+                                const dataValue = d[projId] || 0;
                                 return (
-                                    <circle key={`${emp}-${i}`} cx={x} cy={y} r="4" fill={colors[empIndex % colors.length]} stroke="currentColor" className="stroke-white dark:stroke-slate-800" strokeWidth="2"
-                                        onMouseMove={(e) => {
-                                            if (!containerRef.current) return;
-                                            const containerRect = containerRef.current.getBoundingClientRect();
-                                            const targetRect = e.currentTarget.getBoundingClientRect();
-                                            const xPos = targetRect.left - containerRect.left + targetRect.width / 2;
-                                            const yPos = targetRect.top - containerRect.top;
-                                            const content = (
-                                                <div className="text-center">
-                                                    <div className="font-semibold text-slate-800 dark:text-slate-100">{emp}</div>
-                                                    <div className="text-slate-600 dark:text-slate-400">{`${d[emp]} prazo(s) em ${d.month}`}</div>
-                                                </div>
-                                            );
-                                            setTooltip({ x: xPos, y: yPos, content });
-                                        }}
-                                        onMouseLeave={() => setTooltip(null)}
-                                    />
+                                    <g key={`${projId}-${i}`}>
+                                        <circle cx={x} cy={y} r="4" fill={colors[projIndex % colors.length]} stroke="currentColor" className="stroke-white dark:stroke-slate-800" strokeWidth="2"
+                                            onMouseMove={(e) => {
+                                                if (!containerRef.current) return;
+                                                const containerRect = containerRef.current.getBoundingClientRect();
+                                                const targetRect = e.currentTarget.getBoundingClientRect();
+                                                const xPos = targetRect.left - containerRect.left + targetRect.width / 2;
+                                                const yPos = targetRect.top - containerRect.top;
+                                                
+                                                const projetistaName = projetistaMap.get(projId) || 'Desconhecido';
+                                                
+                                                const content = (
+                                                    <div className="text-center">
+                                                        <div className="font-semibold text-slate-800 dark:text-slate-100">{projetistaName}</div>
+                                                        <div className="text-slate-600 dark:text-slate-400">{`${dataValue} prazo(s) em ${d.month}`}</div>
+                                                    </div>
+                                                );
+                                                setTooltip({ x: xPos, y: yPos, content });
+                                            }}
+                                            onMouseLeave={() => setTooltip(null)}
+                                        />
+                                        {dataValue > 0 && (
+                                            <text
+                                                x={x}
+                                                y={y - 8}
+                                                textAnchor="middle"
+                                                fill="currentColor"
+                                                className="text-xs text-slate-500 dark:text-slate-400 font-semibold pointer-events-none"
+                                            >
+                                                {dataValue}
+                                            </text>
+                                        )}
+                                    </g>
                                 );
                             })
                          )}
@@ -328,15 +435,15 @@ const ProjectDeadlineTrendChart: React.FC<{ projects: Projeto[] }> = React.memo(
                     <CustomTooltip position={tooltip ? {x: tooltip.x, y: tooltip.y} : null} content={tooltip?.content} />
                 </div>
                 <div className="flex flex-wrap justify-center gap-x-4 gap-y-2 mt-4 px-6">
-                    {empreendimentos.map((emp, i) => (
-                        <div key={emp} className="flex items-center">
+                    {involvedProjetistas.map((projId, i) => (
+                        <div key={projId} className="flex items-center">
                             <span className="w-3 h-3 rounded-full mr-2" style={{ backgroundColor: colors[i % colors.length] }}></span>
-                            <span className="text-xs text-slate-600 dark:text-slate-300">{emp}</span>
+                            <span className="text-xs text-slate-600 dark:text-slate-300">{projetistaMap.get(projId) || 'Desconhecido'}</span>
                         </div>
                     ))}
                 </div>
                 </>
-            ) : <p className="text-sm text-center text-slate-500 dark:text-slate-400 py-8 px-6">Nenhum projeto com prazo definido.</p>}
+            ) : <p className="text-sm text-center text-slate-500 dark:text-slate-400 py-8 px-6">Nenhum projeto com prazo definido para este empreendimento.</p>}
         </div>
     );
 });
@@ -410,12 +517,16 @@ const ProjectDashboardView: React.FC = () => {
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
-                <div className="lg:col-span-2 flex flex-col gap-6">
+                <div className="lg:col-span-2">
                     <ProjectsByCompanyChart projects={projetos} projetistas={projetistas} />
-                    <ProjectDeadlineTrendChart projects={projetos} />
                 </div>
-                <div className="lg:col-span-1 flex flex-col gap-6">
-                    <ProjectStatusPieChart projects={projetos} />
+                <div className="lg:col-span-1">
+                     <ProjectStatusPieChart projects={projetos} />
+                </div>
+                <div className="lg:col-span-2">
+                    <ProjectDeadlineTrendChart projects={projetos} projetistas={projetistas} />
+                </div>
+                <div className="lg:col-span-1">
                     <UpcomingDeadlinesList projects={projetos} projetistas={projetistas} />
                 </div>
             </div>
