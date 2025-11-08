@@ -107,9 +107,9 @@ export interface Webhook {
 // --- Types for Project Control ---
 export type ProjectStatus = 'pending' | 'in-progress' | 'completed' | 'overdue';
 
-export type Disciplina = 'Civil' | 'Eletromecânico' | 'Elétrica' | 'Telecom' | 'Arquitetônico' | 'Outra';
+export type Disciplina = 'Civil' | 'Eletromecânico' | 'Elétrica' | 'Telecom' | 'Arquitetônico' | 'Geral' | 'Outra';
 
-export const disciplinas: Disciplina[] = ['Civil', 'Eletromecânico', 'Elétrica', 'Telecom', 'Arquitetônico', 'Outra'];
+export const disciplinas: Disciplina[] = ['Civil', 'Eletromecânico', 'Elétrica', 'Telecom', 'Arquitetônico', 'Geral', 'Outra'];
 
 export interface Projetista {
   id: string;

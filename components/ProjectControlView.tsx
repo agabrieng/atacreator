@@ -32,7 +32,7 @@ const ProjectControlView: React.FC<{ setToast: ToastFunc; projetistas: Projetist
     const [projetos, setProjetos] = useState<Projeto[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
-    const [expandedProjetistas, setExpandedProjetistas] = useState<Record<string, boolean>>({});
+    const [expandedKeys, setExpandedKeys] = useState<Record<string, boolean>>({});
 
     // Modal/Form State
     const [isProjetoModalOpen, setIsProjetoModalOpen] = useState(false);
@@ -57,34 +57,45 @@ const ProjectControlView: React.FC<{ setToast: ToastFunc; projetistas: Projetist
         fetchData();
     }, []);
 
-    const projetosByProjetista = useMemo(() => {
-        return projetos.reduce((acc, projeto) => {
-            (acc[projeto.projetistaId] = acc[projeto.projetistaId] || []).push(projeto);
-            return acc;
-        }, {} as Record<string, Projeto[]>);
+    const toggleExpand = (key: string) => {
+        setExpandedKeys(prev => ({ ...prev, [key]: !prev[key] }));
+    };
+
+    const projetistaMap = useMemo(() => {
+        return new Map(projetistas.map(p => [p.id, p]));
+    }, [projetistas]);
+
+    // Fix: Changed interface to a type alias with Record to improve type inference.
+    type GroupedData = Record<string, Record<string, Record<string, Projeto[]>>>;
+
+    const groupedData = useMemo(() => {
+        const grouped: GroupedData = {};
+        
+        // Sort all projects by deadline first
+        const sortedProjetos = [...projetos].sort((a, b) => new Date(a.deadline).getTime() - new Date(b.deadline).getTime());
+
+        for (const projeto of sortedProjetos) {
+            const emp = projeto.empreendimento || 'Sem Empreendimento';
+            const projId = projeto.projetistaId;
+            const disc = projeto.disciplina || 'Sem Disciplina';
+
+            if (!grouped[emp]) grouped[emp] = {};
+            if (!grouped[emp][projId]) grouped[emp][projId] = {};
+            if (!grouped[emp][projId][disc]) grouped[emp][projId][disc] = [];
+            
+            grouped[emp][projId][disc].push(projeto);
+        }
+        return grouped;
     }, [projetos]);
-    
 
     // Handlers for Projetos
-    // FIX: Corrected the function signature and logic to resolve a type error and handle completion dates more reliably.
-    const handleSaveProjeto = async (data: Omit<Projeto, 'id' | 'dataEntrega'>) => {
+    const handleSaveProjeto = async (data: Omit<Projeto, 'id'>) => {
         try {
-            if (editingProjeto && 'id' in editingProjeto) {
-                const dataToUpdate: Partial<Projeto> = { ...data };
-                // Handle completion date based on status transition
-                if (data.status === 'completed' && editingProjeto.status !== 'completed') {
-                    dataToUpdate.dataEntrega = new Date().toISOString().split('T')[0];
-                } else if (data.status !== 'completed' && editingProjeto.status === 'completed') {
-                    dataToUpdate.dataEntrega = null;
-                }
-                await updateProjeto(editingProjeto.id!, dataToUpdate);
+            if (editingProjeto && editingProjeto.id) {
+                await updateProjeto(editingProjeto.id, data);
                 setToast({ message: 'Projeto atualizado com sucesso!', type: 'success' });
             } else {
-                const dataForAdd: Omit<Projeto, 'id'> = {
-                    ...data,
-                    dataEntrega: data.status === 'completed' ? new Date().toISOString().split('T')[0] : null,
-                };
-                await addProjeto(dataForAdd);
+                await addProjeto(data);
                 setToast({ message: 'Projeto adicionado com sucesso!', type: 'success' });
             }
             fetchData();
@@ -106,11 +117,15 @@ const ProjectControlView: React.FC<{ setToast: ToastFunc; projetistas: Projetist
         }
     };
     
+    // Fix: Refactored logic to be clearer and avoid type comparison error.
     const handleStatusChange = async (projeto: Projeto, newStatus: ProjectStatus) => {
         const dataToUpdate: Partial<Projeto> = { status: newStatus };
-        if (newStatus === 'completed') {
+        const wasCompleted = projeto.status === 'completed';
+        const isNowCompleted = newStatus === 'completed';
+
+        if (isNowCompleted && !wasCompleted) {
             dataToUpdate.dataEntrega = new Date().toISOString().split('T')[0];
-        } else if (projeto.status === 'completed' && newStatus !== 'completed') {
+        } else if (wasCompleted && !isNowCompleted) {
             dataToUpdate.dataEntrega = null;
         }
 
@@ -150,83 +165,98 @@ const ProjectControlView: React.FC<{ setToast: ToastFunc; projetistas: Projetist
                     </h1>
                     <p className="text-slate-500 dark:text-slate-400">Gerencie os entregáveis das empresas projetistas contratadas.</p>
                 </div>
+                 <button onClick={() => { setEditingProjeto({ projetistaId: '', empreendimento: '', contrato: '', taxonomia: '', disciplina: 'Civil' }); setIsProjetoModalOpen(true); }} className="inline-flex items-center px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700 shadow-sm"><PlusIcon className="w-5 h-5 mr-2"/> Novo Projeto</button>
             </header>
 
             <div className="space-y-4">
-                {projetistas.length === 0 ? (
+                {Object.entries(groupedData).length === 0 ? (
                     <div className="text-center py-16 border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-lg">
                         <BriefcaseIcon className="w-16 h-16 mb-4 text-slate-300 dark:text-slate-600 mx-auto" />
-                        <h3 className="text-lg font-semibold text-slate-700 dark:text-slate-200">Nenhuma Empresa Projetista Cadastrada</h3>
-                        <p className="max-w-md mt-1 text-sm text-slate-500 dark:text-slate-400 mx-auto">Vá para as Configurações para adicionar uma empresa e começar a gerenciar seus projetos.</p>
+                        <h3 className="text-lg font-semibold text-slate-700 dark:text-slate-200">Nenhum Projeto Cadastrado</h3>
+                        <p className="max-w-md mt-1 text-sm text-slate-500 dark:text-slate-400 mx-auto">Clique em "Novo Projeto" para começar a gerenciar seus entregáveis.</p>
                     </div>
                 ) : (
-                    projetistas.map(p => (
-                        <div key={p.id} className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-sm">
-                            <button 
-                                className="w-full flex items-center justify-between p-4"
-                                onClick={() => setExpandedProjetistas(prev => ({...prev, [p.id]: !prev[p.id]}))}
-                            >
-                                <div className="flex items-center">
-                                    <div className="w-12 h-12 bg-slate-100 dark:bg-slate-700 rounded-full flex items-center justify-center overflow-hidden mr-4">
-                                        {p.logo ? <img src={p.logo} alt={p.name} className="w-full h-full object-cover" /> : <BriefcaseIcon className="w-6 h-6 text-slate-400"/>}
-                                    </div>
-                                    <h2 className="text-xl font-bold text-slate-800 dark:text-slate-100">{p.name}</h2>
-                                </div>
-                                <div className="flex items-center">
-                                    <span className="text-sm text-slate-500 dark:text-slate-400 mr-4">{(projetosByProjetista[p.id] || []).length} projeto(s)</span>
-                                    <ChevronRightIcon className={`w-6 h-6 text-slate-500 transform transition-transform ${expandedProjetistas[p.id] ? 'rotate-90' : ''}`} />
-                                </div>
-                            </button>
-                            {expandedProjetistas[p.id] && (
-                                <div className="p-4 border-t border-slate-100 dark:border-slate-700">
-                                    <div className="flex justify-end items-center gap-2 mb-4">
-                                        <button onClick={() => { setEditingProjeto({ projetistaId: p.id, empreendimento: '', contrato: '', taxonomia: '', disciplina: 'Civil' }); setIsProjetoModalOpen(true); }} className="inline-flex items-center px-3 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700 shadow-sm"><PlusIcon className="w-4 h-4 mr-1"/> Novo Projeto</button>
-                                    </div>
-                                    <div className="space-y-3">
-                                        {(projetosByProjetista[p.id] || []).sort((a,b) => new Date(a.deadline).getTime() - new Date(b.deadline).getTime()).map(proj => {
-                                            const currentStatus = getStatusWithOverdueCheck(proj.status, proj.deadline);
-                                            const statusInfo = statusConfig[currentStatus];
+                    Object.entries(groupedData).map(([empreendimento, projetistasGroup]) => {
+                        const empKey = `emp-${empreendimento}`;
+                        const totalProjetosEmpreendimento = Object.values(projetistasGroup).flatMap(disciplinas => Object.values(disciplinas).flat()).length;
+                        return (
+                            <div key={empKey} className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-sm">
+                                <button className="w-full flex items-center justify-between p-4 text-left" onClick={() => toggleExpand(empKey)}>
+                                    <h2 className="text-xl font-bold text-slate-800 dark:text-slate-100">{empreendimento}</h2>
+                                    <div className="flex items-center"><span className="text-sm text-slate-500 dark:text-slate-400 mr-4">{totalProjetosEmpreendimento} projeto(s)</span><ChevronRightIcon className={`w-6 h-6 text-slate-500 transform transition-transform ${expandedKeys[empKey] ? 'rotate-90' : ''}`} /></div>
+                                </button>
+                                {expandedKeys[empKey] && (
+                                    <div className="p-2 space-y-2">
+                                        {Object.entries(projetistasGroup).map(([projetistaId, disciplinasGroup]) => {
+                                            const projKey = `${empKey}_proj-${projetistaId}`;
+                                            const projetista = projetistaMap.get(projetistaId);
+                                            if (!projetista) return null;
+                                            const totalProjetosProjetista = Object.values(disciplinasGroup).flat().length;
                                             return (
-                                                <div key={proj.id} className="grid grid-cols-[1fr,auto] gap-4 items-start p-3 border border-slate-200 dark:border-slate-700 rounded-lg">
-                                                    <div>
-                                                        <p className="font-semibold text-slate-800 dark:text-slate-200">{proj.name}</p>
-                                                        <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">{proj.description}</p>
-                                                        <div className="mt-2 text-xs text-slate-500 dark:text-slate-400 grid grid-cols-2 gap-x-4 gap-y-1">
-                                                            <div><strong>Empreendimento:</strong> {proj.empreendimento}</div>
-                                                            <div><strong>Contrato:</strong> {proj.contrato}</div>
-                                                            <div><strong>Disciplina:</strong> {proj.disciplina}</div>
-                                                            <div><strong>Taxonomia:</strong> {proj.taxonomia}</div>
-                                                             {proj.dataEntrega && <div><strong>Entregue em:</strong> {new Date(proj.dataEntrega).toLocaleDateString('pt-BR', { timeZone: 'UTC' })}</div>}
+                                                <div key={projKey} className="bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-lg ml-4">
+                                                    <button className="w-full flex items-center justify-between p-3 text-left" onClick={() => toggleExpand(projKey)}>
+                                                        <div className="flex items-center"><div className="w-8 h-8 bg-slate-200 dark:bg-slate-700 rounded-full flex items-center justify-center overflow-hidden mr-3">{projetista.logo ? <img src={projetista.logo} alt={projetista.name} className="w-full h-full object-cover" /> : <BriefcaseIcon className="w-4 h-4 text-slate-500"/>}</div><h3 className="text-lg font-semibold text-slate-700 dark:text-slate-200">{projetista.name}</h3></div>
+                                                        <div className="flex items-center"><span className="text-xs text-slate-500 dark:text-slate-400 mr-3">{totalProjetosProjetista} projeto(s)</span><ChevronRightIcon className={`w-5 h-5 text-slate-500 transform transition-transform ${expandedKeys[projKey] ? 'rotate-90' : ''}`} /></div>
+                                                    </button>
+                                                    {expandedKeys[projKey] && (
+                                                        <div className="p-2 space-y-2">
+                                                            {Object.entries(disciplinasGroup).map(([disciplina, projetosInDisciplina]) => {
+                                                                const discKey = `${projKey}_disc-${disciplina}`;
+                                                                return (
+                                                                    <div key={discKey} className="bg-white dark:bg-slate-700/60 border border-slate-200 dark:border-slate-600 rounded-md ml-4">
+                                                                        <button className="w-full flex items-center justify-between p-2 text-left" onClick={() => toggleExpand(discKey)}>
+                                                                            <h4 className="font-semibold text-slate-600 dark:text-slate-300">{disciplina}</h4>
+                                                                            <div className="flex items-center"><span className="text-xs text-slate-500 dark:text-slate-400 mr-2">{projetosInDisciplina.length} projeto(s)</span><ChevronRightIcon className={`w-4 h-4 text-slate-500 transform transition-transform ${expandedKeys[discKey] ? 'rotate-90' : ''}`} /></div>
+                                                                        </button>
+                                                                        {expandedKeys[discKey] && (
+                                                                            <div className="p-4 space-y-3 border-t border-slate-100 dark:border-slate-600">
+                                                                                {projetosInDisciplina.map(proj => {
+                                                                                    const currentStatus = getStatusWithOverdueCheck(proj.status, proj.deadline);
+                                                                                    const statusInfo = statusConfig[currentStatus];
+                                                                                    return (
+                                                                                        <div key={proj.id} className="grid grid-cols-[1fr,auto] gap-4 items-start p-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-sm">
+                                                                                            <div>
+                                                                                                <p className="font-semibold text-slate-800 dark:text-slate-200">{proj.name}</p>
+                                                                                                <div className="mt-2 text-xs text-slate-500 dark:text-slate-400 grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-1">
+                                                                                                    <div><strong>Contrato:</strong> {proj.contrato}</div>
+                                                                                                    <div><strong>Taxonomia:</strong> {proj.taxonomia || 'N/A'}</div>
+                                                                                                    {proj.dataEntrega && <div><strong>Entregue em:</strong> {new Date(proj.dataEntrega).toLocaleDateString('pt-BR', { timeZone: 'UTC' })}</div>}
+                                                                                                </div>
+                                                                                            </div>
+                                                                                            <div className="flex flex-col items-end justify-between h-full">
+                                                                                                <div className="text-right">
+                                                                                                    <p className="text-xs font-medium text-slate-500 dark:text-slate-400">Prazo Acordado</p>
+                                                                                                    <p className="font-semibold text-slate-800 dark:text-slate-200">{new Date(proj.deadline).toLocaleDateString('pt-BR', { timeZone: 'UTC' })}</p>
+                                                                                                </div>
+                                                                                                <div className="flex items-center gap-2 mt-2">
+                                                                                                    <select value={proj.status} onChange={e => handleStatusChange(proj, e.target.value as ProjectStatus)} className={`text-xs font-bold rounded-full px-3 py-1 border-0 focus:ring-2 focus:ring-offset-2 dark:focus:ring-offset-slate-800 focus:ring-blue-500 ${statusInfo.classes}`}>
+                                                                                                        {Object.entries(statusConfig).filter(([key]) => key !== 'overdue').map(([key, value]) => (<option key={key} value={key}>{value.text}</option>))}
+                                                                                                    </select>
+                                                                                                    <button onClick={() => { setEditingProjeto(proj); setIsProjetoModalOpen(true); }} className="p-1.5 text-slate-500 hover:text-blue-600 hover:bg-blue-100 dark:hover:bg-blue-900/50 rounded-full"><EditIcon className="w-4 h-4" /></button>
+                                                                                                    <button onClick={() => setProjetoToDelete(proj)} className="p-1.5 text-slate-500 hover:text-red-600 hover:bg-red-100 dark:hover:bg-red-900/50 rounded-full"><TrashIcon className="w-4 h-4" /></button>
+                                                                                                </div>
+                                                                                            </div>
+                                                                                        </div>
+                                                                                    )
+                                                                                })}
+                                                                            </div>
+                                                                        )}
+                                                                    </div>
+                                                                );
+                                                            })}
                                                         </div>
-                                                    </div>
-                                                     <div className="flex flex-col items-end justify-between h-full">
-                                                        <div className="text-right">
-                                                            <p className="text-xs font-medium text-slate-500 dark:text-slate-400">Prazo Acordado</p>
-                                                            <p className="font-semibold text-slate-800 dark:text-slate-200">{new Date(proj.deadline).toLocaleDateString('pt-BR', { timeZone: 'UTC' })}</p>
-                                                        </div>
-                                                        <div className="flex items-center gap-2 mt-2">
-                                                            <select value={proj.status} onChange={e => handleStatusChange(proj, e.target.value as ProjectStatus)} className={`text-xs font-bold rounded-full px-3 py-1 border-0 focus:ring-2 focus:ring-offset-2 dark:focus:ring-offset-slate-800 focus:ring-blue-500 ${statusInfo.classes}`}>
-                                                                {Object.entries(statusConfig).filter(([key]) => key !== 'overdue').map(([key, value]) => (
-                                                                    <option key={key} value={key}>{value.text}</option>
-                                                                ))}
-                                                            </select>
-                                                            <button onClick={() => { setEditingProjeto(proj); setIsProjetoModalOpen(true); }} className="p-1.5 text-slate-500 hover:text-blue-600 hover:bg-blue-100 dark:hover:bg-blue-900/50 rounded-full"><EditIcon className="w-4 h-4" /></button>
-                                                            <button onClick={() => setProjetoToDelete(proj)} className="p-1.5 text-slate-500 hover:text-red-600 hover:bg-red-100 dark:hover:bg-red-900/50 rounded-full"><TrashIcon className="w-4 h-4" /></button>
-                                                        </div>
-                                                    </div>
+                                                    )}
                                                 </div>
-                                            )
+                                            );
                                         })}
-                                        {(projetosByProjetista[p.id] || []).length === 0 && <p className="text-center text-sm text-slate-500 dark:text-slate-400 py-4">Nenhum projeto cadastrado para esta empresa.</p>}
                                     </div>
-                                </div>
-                            )}
-                        </div>
-                    ))
+                                )}
+                            </div>
+                        )
+                    })
                 )}
             </div>
 
-            {/* Modals and Dialogs */}
             {isProjetoModalOpen && <ProjetoFormModal initialData={editingProjeto} projetistas={projetistas} onSave={handleSaveProjeto} onClose={() => setIsProjetoModalOpen(false)} />}
              <ConfirmationDialog isOpen={!!projetoToDelete} onClose={() => setProjetoToDelete(null)} onConfirm={handleDeleteProjeto} title="Excluir Projeto" confirmText="Excluir">
                 Tem certeza que deseja excluir o projeto <strong>"{projetoToDelete?.name}"</strong>?
@@ -235,23 +265,29 @@ const ProjectControlView: React.FC<{ setToast: ToastFunc; projetistas: Projetist
     );
 };
 
-// --- Modal Components ---
-
-const ProjetoFormModal: React.FC<{ initialData: Partial<Projeto> | null; projetistas: Projetista[]; onSave: (data: Omit<Projeto, 'id' | 'dataEntrega'>) => void; onClose: () => void; }> = ({ initialData, projetistas, onSave, onClose }) => {
+const ProjetoFormModal: React.FC<{ initialData: Partial<Projeto> | null; projetistas: Projetista[]; onSave: (data: Omit<Projeto, 'id'>) => void; onClose: () => void; }> = ({ initialData, projetistas, onSave, onClose }) => {
     const [projetistaId, setProjetistaId] = useState(initialData?.projetistaId || '');
     const [name, setName] = useState(initialData?.name || '');
     const [description, setDescription] = useState(initialData?.description || '');
     const [deadline, setDeadline] = useState(initialData?.deadline || '');
     const [status, setStatus] = useState<ProjectStatus>(initialData?.status || 'pending');
-    // New fields
     const [empreendimento, setEmpreendimento] = useState(initialData?.empreendimento || '');
     const [contrato, setContrato] = useState(initialData?.contrato || '');
     const [taxonomia, setTaxonomia] = useState(initialData?.taxonomia || '');
     const [disciplina, setDisciplina] = useState<Disciplina>(initialData?.disciplina || 'Civil');
+    const [dataEntrega, setDataEntrega] = useState<string | null | undefined>(initialData?.dataEntrega);
 
 
     const handleSave = () => {
-        if (projetistaId && name.trim() && deadline && empreendimento.trim() && contrato.trim() && taxonomia.trim()) {
+        if (projetistaId && name.trim() && deadline && empreendimento.trim() && contrato.trim()) {
+            let finalDataEntrega = dataEntrega;
+            if (status === 'completed' && !finalDataEntrega) {
+                finalDataEntrega = new Date().toISOString().split('T')[0];
+            }
+            if (status !== 'completed') {
+                finalDataEntrega = null;
+            }
+            
             onSave({ 
                 projetistaId, 
                 name: name.trim(), 
@@ -261,7 +297,8 @@ const ProjetoFormModal: React.FC<{ initialData: Partial<Projeto> | null; projeti
                 empreendimento: empreendimento.trim(),
                 contrato: contrato.trim(),
                 taxonomia: taxonomia.trim(),
-                disciplina
+                disciplina,
+                dataEntrega: finalDataEntrega
             });
         }
     };
@@ -273,18 +310,18 @@ const ProjetoFormModal: React.FC<{ initialData: Partial<Projeto> | null; projeti
                     <h3 className="text-lg font-bold text-slate-900 dark:text-slate-100">{initialData?.id ? 'Editar' : 'Adicionar'} Projeto</h3>
                     <div className="mt-4 space-y-4 max-h-[60vh] overflow-y-auto pr-2">
                          <div>
-                            <label htmlFor="projetista-select" className="block text-sm font-medium">Empresa Responsável</label>
-                            <select id="projetista-select" value={projetistaId} onChange={e => setProjetistaId(e.target.value)} disabled={!!initialData?.id} className="mt-1 w-full p-2 border border-slate-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-700 disabled:bg-slate-100 dark:disabled:bg-slate-900">
+                            <label htmlFor="projetista-select" className="block text-sm font-medium">Empresa Responsável<span className="text-red-500"> *</span></label>
+                            <select id="projetista-select" value={projetistaId} onChange={e => setProjetistaId(e.target.value)} className="mt-1 w-full p-2 border border-slate-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-700 disabled:bg-slate-100 dark:disabled:bg-slate-900">
                                 <option value="" disabled>Selecione uma empresa</option>
                                 {projetistas.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
                             </select>
                         </div>
                         <div>
-                            <label htmlFor="empreendimento" className="block text-sm font-medium">Empreendimento</label>
+                            <label htmlFor="empreendimento" className="block text-sm font-medium">Empreendimento<span className="text-red-500"> *</span></label>
                             <input id="empreendimento" type="text" value={empreendimento} onChange={e => setEmpreendimento(e.target.value)} className="mt-1 w-full p-2 border border-slate-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-700" />
                         </div>
                         <div>
-                            <label htmlFor="projeto-name" className="block text-sm font-medium">Nome do Projeto/Entregável</label>
+                            <label htmlFor="projeto-name" className="block text-sm font-medium">Nome do Projeto/Entregável<span className="text-red-500"> *</span></label>
                             <input id="projeto-name" type="text" value={name} onChange={e => setName(e.target.value)} className="mt-1 w-full p-2 border border-slate-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-700" />
                         </div>
                          <div>
@@ -293,7 +330,7 @@ const ProjetoFormModal: React.FC<{ initialData: Partial<Projeto> | null; projeti
                         </div>
                         <div className="grid grid-cols-2 gap-4">
                             <div>
-                                <label htmlFor="contrato" className="block text-sm font-medium">Nº do Contrato</label>
+                                <label htmlFor="contrato" className="block text-sm font-medium">Nº do Contrato<span className="text-red-500"> *</span></label>
                                 <input id="contrato" type="text" value={contrato} onChange={e => setContrato(e.target.value)} className="mt-1 w-full p-2 border border-slate-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-700" />
                             </div>
                             <div>
@@ -301,7 +338,7 @@ const ProjetoFormModal: React.FC<{ initialData: Partial<Projeto> | null; projeti
                                 <input id="taxonomia" type="text" value={taxonomia} onChange={e => setTaxonomia(e.target.value)} className="mt-1 w-full p-2 border border-slate-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-700" />
                             </div>
                              <div>
-                                <label htmlFor="disciplina" className="block text-sm font-medium">Disciplina</label>
+                                <label htmlFor="disciplina" className="block text-sm font-medium">Disciplina<span className="text-red-500"> *</span></label>
                                 <select id="disciplina" value={disciplina} onChange={e => setDisciplina(e.target.value as Disciplina)} className="mt-1 w-full p-2 border border-slate-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-700">
                                     {disciplinas.map(d => <option key={d} value={d}>{d}</option>)}
                                 </select>
@@ -310,7 +347,7 @@ const ProjetoFormModal: React.FC<{ initialData: Partial<Projeto> | null; projeti
 
                         <div className="grid grid-cols-2 gap-4">
                              <div>
-                                <label htmlFor="projeto-deadline" className="block text-sm font-medium">Prazo</label>
+                                <label htmlFor="projeto-deadline" className="block text-sm font-medium">Prazo<span className="text-red-500"> *</span></label>
                                 <input id="projeto-deadline" type="date" value={deadline} onChange={e => setDeadline(e.target.value)} className="mt-1 w-full p-2 border border-slate-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-700" />
                             </div>
                             <div>
@@ -322,11 +359,17 @@ const ProjetoFormModal: React.FC<{ initialData: Partial<Projeto> | null; projeti
                                 </select>
                             </div>
                         </div>
+                        {status === 'completed' && (
+                            <div>
+                                <label htmlFor="data-entrega" className="block text-sm font-medium">Data de Entrega<span className="text-red-500"> *</span></label>
+                                <input id="data-entrega" type="date" value={dataEntrega || ''} onChange={e => setDataEntrega(e.target.value)} className="mt-1 w-full p-2 border border-slate-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-700" />
+                            </div>
+                        )}
                     </div>
                 </div>
                 <div className="bg-slate-50 dark:bg-slate-800/50 px-6 py-4 flex justify-end gap-3 rounded-b-xl">
                     <button onClick={onClose} className="px-4 py-2 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-md">Cancelar</button>
-                    <button onClick={handleSave} disabled={!projetistaId || !name.trim() || !deadline || !empreendimento.trim() || !contrato.trim() || !taxonomia.trim()} className="px-4 py-2 bg-blue-600 text-white rounded-md disabled:bg-blue-400">Salvar</button>
+                    <button onClick={handleSave} disabled={!projetistaId || !name.trim() || !deadline || !empreendimento.trim() || !contrato.trim()} className="px-4 py-2 bg-blue-600 text-white rounded-md disabled:bg-blue-400">Salvar</button>
                 </div>
             </div>
         </div>

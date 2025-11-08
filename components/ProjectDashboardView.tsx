@@ -1,4 +1,5 @@
 
+
 import React, { useState, useEffect, useMemo, ReactNode } from 'react';
 import { getProjetistas, getProjetos } from '../services/firebaseService';
 import type { Projetista, Projeto, ProjectStatus } from '../types';
@@ -100,10 +101,12 @@ const ProjectsByCompanyChart: React.FC<{ projects: Projeto[]; projetistas: Proje
     const statusColors: Record<ProjectStatus, string> = { completed: '#10b981', 'in-progress': '#3b82f6', pending: '#64748b', overdue: '#ef4444' };
     
     const data = useMemo(() => {
-        const projetistaMap = new Map(projetistas.map(p => [p.id, p.name]));
+        // Fix: Add explicit type to `p` to fix inference error.
+        const projetistaMap = new Map(projetistas.map((p: Projetista) => [p.id, p.name]));
         const counts = new Map<string, Record<ProjectStatus, number>>();
 
-        projects.forEach(proj => {
+        // Fix: Add explicit type to `proj` to fix inference error.
+        projects.forEach((proj: Projeto) => {
             const name = projetistaMap.get(proj.projetistaId) || 'Desconhecida';
             if (!counts.has(name)) {
                 counts.set(name, { completed: 0, overdue: 0, 'in-progress': 0, pending: 0 });
