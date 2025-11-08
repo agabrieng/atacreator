@@ -1,6 +1,4 @@
-
-
-import React, { useState, useEffect, useMemo, ReactNode } from 'react';
+import React, { useState, useEffect, useMemo, ReactNode, useRef } from 'react';
 import { getProjetistas, getProjetos } from '../services/firebaseService';
 import type { Projetista, Projeto, ProjectStatus } from '../types';
 import { AlertTriangleIcon, BriefcaseIcon, CheckCircleIcon, PieChartIcon, TargetIcon, TrendingUpIcon } from './icons';
@@ -39,6 +37,22 @@ const StatCard: React.FC<StatCardProps> = ({ title, value, icon: Icon, color }) 
         </div>
     </div>
 );
+
+
+const CustomTooltip: React.FC<{
+  content: ReactNode;
+  position: { x: number; y: number } | null;
+}> = React.memo(({ content, position }) => {
+  if (!position) return null;
+  return (
+    <div
+      className="absolute bg-white dark:bg-slate-900 shadow-lg rounded-lg p-3 text-sm border border-slate-200 dark:border-slate-700 pointer-events-none z-10"
+      style={{ left: position.x, top: position.y, transform: 'translate(-50%, calc(-100% - 8px))' }}
+    >
+      {content}
+    </div>
+  );
+});
 
 
 const ProjectStatusPieChart: React.FC<{ projects: Projeto[] }> = React.memo(({ projects }) => {
@@ -175,6 +189,158 @@ const UpcomingDeadlinesList: React.FC<{ projects: Projeto[]; projetistas: Projet
     );
 });
 
+const ProjectDeadlineTrendChart: React.FC<{ projects: Projeto[] }> = React.memo(({ projects }) => {
+    const { data, empreendimentos, maxCount } = useMemo(() => {
+        if (projects.length === 0) {
+            return { data: [], empreendimentos: [], maxCount: 5 };
+        }
+
+        const validProjects = projects.filter(p => p.deadline && !isNaN(new Date(p.deadline).getTime()));
+        if (validProjects.length === 0) {
+            return { data: [], empreendimentos: [], maxCount: 5 };
+        }
+
+        const dates = validProjects.map(p => new Date(p.deadline));
+        const minDate = new Date(Math.min(...dates.map(d => d.getTime())));
+        const maxDate = new Date(Math.max(...dates.map(d => d.getTime())));
+
+        const startYear = minDate.getUTCFullYear();
+        const startMonth = minDate.getUTCMonth();
+        
+        const monthlyData: Record<string, Record<string, number>> = {}; // key: 'YYYY-MM'
+        const empreendimentoSet = new Set<string>();
+
+        validProjects.forEach(p => {
+            const deadlineDate = new Date(p.deadline);
+            const year = deadlineDate.getUTCFullYear();
+            const month = deadlineDate.getUTCMonth();
+            const key = `${year}-${month}`;
+            
+            const empreendimento = p.empreendimento || 'Não Especificado';
+            empreendimentoSet.add(empreendimento);
+
+            if (!monthlyData[key]) monthlyData[key] = {};
+            monthlyData[key][empreendimento] = (monthlyData[key][empreendimento] || 0) + 1;
+        });
+        
+        const empreendimentoList = Array.from(empreendimentoSet);
+        
+        const labels: { year: number, month: number, label: string }[] = [];
+        let currentDate = new Date(Date.UTC(startYear, startMonth, 1));
+        const lastDate = new Date(Date.UTC(maxDate.getUTCFullYear(), maxDate.getUTCMonth(), 1));
+
+        while(currentDate <= lastDate) {
+            const year = currentDate.getUTCFullYear();
+            const month = currentDate.getUTCMonth();
+            const monthLabel = currentDate.toLocaleString('pt-BR', { month: 'short', timeZone: 'UTC' }).replace('.', '');
+            labels.push({ year, month, label: `${monthLabel}/${year.toString().slice(-2)}` });
+            currentDate.setUTCMonth(currentDate.getUTCMonth() + 1);
+        }
+        
+        const chartData = labels.map(({ year, month, label }) => {
+            const key = `${year}-${month}`;
+            const entry: any = { month: label };
+            const monthlyCounts = monthlyData[key] || {};
+            empreendimentoList.forEach(emp => {
+                entry[emp] = monthlyCounts[emp] || 0;
+            });
+            return entry;
+        });
+
+        const allCounts = chartData.flatMap(d => empreendimentoList.map(emp => d[emp]));
+        const currentMaxCount = Math.max(0, ...allCounts);
+        const maxCount = Math.max(5, Math.ceil(currentMaxCount / 5) * 5);
+
+        return { data: chartData, empreendimentos: empreendimentoList, maxCount };
+    }, [projects]);
+    
+    const colors = ['#3b82f6', '#10b981', '#f97316', '#8b5cf6', '#ec4899', '#64748b', '#ef4444'];
+    const [tooltip, setTooltip] = useState<{ x: number; y: number; content: ReactNode } | null>(null);
+    const containerRef = useRef<HTMLDivElement>(null);
+
+    const getPath = (empreendimento: string, width: number, height: number) => {
+        let path = '';
+        data.forEach((d, i) => {
+            const x = data.length > 1 ? (i / (data.length - 1)) * (width - 35) + 30 : width / 2;
+            const y = height - 20 - (d[empreendimento] / maxCount) * (height - 40);
+            path += `${i === 0 ? 'M' : 'L'}${x},${y} `;
+        });
+        return path;
+    };
+
+    return (
+        <div className="bg-white dark:bg-slate-800 pt-6 pb-6 rounded-xl shadow-lg border border-slate-200 dark:border-slate-700">
+            <h3 className="text-lg font-semibold text-slate-800 dark:text-slate-200 mb-4 flex items-center px-6">
+                <TrendingUpIcon className="w-5 h-5 mr-2 text-slate-500"/>
+                Cronograma de Prazos por Empreendimento
+            </h3>
+            {empreendimentos.length > 0 ? (
+                <>
+                <div className="relative h-64" ref={containerRef}>
+                    <svg width="100%" height="100%" viewBox="0 0 400 300" preserveAspectRatio="xMidYMid meet">
+                        {/* Y-Axis Grid & Labels */}
+                        {Array.from({length: 6}).map((_, i) => (
+                            <g key={i}>
+                                <line x1="30" x2="395" y1={`${20 + i * ((280-20)/5)}`} y2={`${20 + i * ((280-20)/5)}`} stroke="currentColor" className="text-slate-200 dark:text-slate-700" strokeWidth="0.5" />
+                                <text x="25" y={`${20 + i * ((280-20)/5)}`} textAnchor="end" alignmentBaseline="middle" fill="currentColor" className="text-xs text-slate-400 dark:text-slate-500">
+                                  {Math.round(maxCount * (1 - i/5))}
+                                </text>
+                            </g>
+                        ))}
+                        {/* X-Axis Labels */}
+                        {data.map((d, i) => {
+                             const x = data.length > 1 ? (i / (data.length - 1)) * (395 - 30) + 30 : 400 / 2;
+                             return (
+                                <text key={i} x={x} y="295" textAnchor="middle" fill="currentColor" className="text-xs text-slate-500 dark:text-slate-400 capitalize">{d.month}</text>
+                             );
+                        })}
+                        {/* Lines */}
+                        {empreendimentos.map((emp, empIndex) => (
+                             <path key={emp} d={getPath(emp, 400, 300)} fill="none" stroke={colors[empIndex % colors.length]} strokeWidth="2" />
+                        ))}
+                        {/* Circles & Tooltips */}
+                         {empreendimentos.map((emp, empIndex) => 
+                            data.map((d, i) => {
+                                const x = data.length > 1 ? (i / (data.length - 1)) * (400 - 35) + 30 : 400 / 2;
+                                const y = 300 - 20 - (d[emp] / maxCount) * (300 - 40);
+                                return (
+                                    <circle key={`${emp}-${i}`} cx={x} cy={y} r="4" fill={colors[empIndex % colors.length]} stroke="currentColor" className="stroke-white dark:stroke-slate-800" strokeWidth="2"
+                                        onMouseMove={(e) => {
+                                            if (!containerRef.current) return;
+                                            const containerRect = containerRef.current.getBoundingClientRect();
+                                            const targetRect = e.currentTarget.getBoundingClientRect();
+                                            const xPos = targetRect.left - containerRect.left + targetRect.width / 2;
+                                            const yPos = targetRect.top - containerRect.top;
+                                            const content = (
+                                                <div className="text-center">
+                                                    <div className="font-semibold text-slate-800 dark:text-slate-100">{emp}</div>
+                                                    <div className="text-slate-600 dark:text-slate-400">{`${d[emp]} prazo(s) em ${d.month}`}</div>
+                                                </div>
+                                            );
+                                            setTooltip({ x: xPos, y: yPos, content });
+                                        }}
+                                        onMouseLeave={() => setTooltip(null)}
+                                    />
+                                );
+                            })
+                         )}
+                    </svg>
+                    <CustomTooltip position={tooltip ? {x: tooltip.x, y: tooltip.y} : null} content={tooltip?.content} />
+                </div>
+                <div className="flex flex-wrap justify-center gap-x-4 gap-y-2 mt-4 px-6">
+                    {empreendimentos.map((emp, i) => (
+                        <div key={emp} className="flex items-center">
+                            <span className="w-3 h-3 rounded-full mr-2" style={{ backgroundColor: colors[i % colors.length] }}></span>
+                            <span className="text-xs text-slate-600 dark:text-slate-300">{emp}</span>
+                        </div>
+                    ))}
+                </div>
+                </>
+            ) : <p className="text-sm text-center text-slate-500 dark:text-slate-400 py-8 px-6">Nenhum projeto com prazo definido.</p>}
+        </div>
+    );
+});
+
 
 const ProjectDashboardView: React.FC = () => {
     const [projetistas, setProjetistas] = useState<Projetista[]>([]);
@@ -246,6 +412,7 @@ const ProjectDashboardView: React.FC = () => {
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
                 <div className="lg:col-span-2 flex flex-col gap-6">
                     <ProjectsByCompanyChart projects={projetos} projetistas={projetistas} />
+                    <ProjectDeadlineTrendChart projects={projetos} />
                 </div>
                 <div className="lg:col-span-1 flex flex-col gap-6">
                     <ProjectStatusPieChart projects={projetos} />
