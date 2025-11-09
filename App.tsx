@@ -1,5 +1,7 @@
 
 
+
+
 import React, { useState, useCallback, useEffect, useMemo } from 'react';
 import type { AtaData, AdminSettings, Participant, PautaItem, Empreendimento, Webhook, Projetista } from './types';
 import { generateAtaData } from './services/geminiService';
@@ -34,6 +36,7 @@ import SettingsPanel from './components/SettingsPanel';
 import AtaRepositoryView from './components/AtaRepository';
 import ProjectControlView from './components/ProjectControlView';
 import ProjectDashboardView from './components/ProjectDashboardView';
+import GeneralDashboardView from './components/GeneralDashboardView';
 import ProjetistasPanel from './components/ProjetistasPanel';
 import { AlertTriangleIcon, EditIcon, CheckIcon, CopyIcon, UploadCloudIcon, DownloadCloudIcon, FilePdfIcon, CheckCircleIcon, XIcon, CalendarCheckIcon, SettingsIcon, SendIcon, BriefcaseIcon } from './components/icons';
 
@@ -46,7 +49,7 @@ const DEFAULT_SETTINGS: AdminSettings = {
     propertyInfo: 'AS INFORMAÇÕES DESTE DOCUMENTO SÃO DE PROPRIEDADE DA SUA EMPRESA, SENDO PROIBIDA A UTILIZAÇÃO FORA DA SUA FINALIDADE.',
 };
 
-type View = 'dashboard' | 'ataCreator' | 'ataRepository' | 'deadlinePanel' | 'settings' | 'projectControl' | 'projectDashboard';
+type View = 'generalDashboard' | 'ataDashboard' | 'ataCreator' | 'ataRepository' | 'deadlinePanel' | 'settings' | 'projectControl' | 'projectDashboard';
 
 const ActionButton: React.FC<{
     onClick?: () => void;
@@ -111,7 +114,8 @@ const AtaCreatorView: React.FC<{
     currentCompanyName: string;
     setToast: (toast: { message: string; type: 'success' | 'error' } | null) => void;
     empreendimentos: Empreendimento[];
-}> = ({ initialAta, onAtaViewed, companyProfiles, currentCompanyName, setToast, empreendimentos }) => {
+    initialMode: 'view' | 'edit';
+}> = ({ initialAta, onAtaViewed, companyProfiles, currentCompanyName, setToast, empreendimentos, initialMode }) => {
   
   const adminSettings = companyProfiles[currentCompanyName] || null;
 
@@ -203,9 +207,9 @@ const AtaCreatorView: React.FC<{
       setAssunto(selectedAta.assunto || '');
       setLocal(selectedAta.local || '');
       setVttContent('');
-      setIsEditing(true); // Abrir em modo de edição
+      setIsEditing(initialMode === 'edit'); // Abrir em modo de edição ou visualização
       setIsFormCollapsed(true);
-    }, []);
+    }, [initialMode]);
     
     // Handle initial ata passed via props
     useEffect(() => {
@@ -688,7 +692,7 @@ const SettingsView: React.FC<{
 
 
 const App: React.FC = () => {
-  const [currentView, setCurrentView] = useState<View>('dashboard');
+  const [currentView, setCurrentView] = useState<View>('generalDashboard');
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => {
     try {
       const savedState = localStorage.getItem('sidebarCollapsed');
@@ -699,6 +703,7 @@ const App: React.FC = () => {
   });
 
   const [ataToView, setAtaToView] = useState<AtaData | null>(null);
+  const [ataInitialMode, setAtaInitialMode] = useState<'view' | 'edit'>('edit');
   
   // State lifted to App
   const [companyProfiles, setCompanyProfiles] = useState<Record<string, AdminSettings>>({});
@@ -880,8 +885,9 @@ const App: React.FC = () => {
     });
   };
   
-  const handleNavigateToAta = (ata: AtaData) => {
+  const handleNavigateToAta = (ata: AtaData, mode: 'view' | 'edit' = 'edit') => {
     setAtaToView(ata);
+    setAtaInitialMode(mode);
     setCurrentView('ataCreator');
   };
 
@@ -901,10 +907,11 @@ const App: React.FC = () => {
       />
       <div className={`flex-1 w-full transition-all duration-300 ease-in-out ${isSidebarCollapsed ? 'pl-20' : 'pl-64'}`}>
         {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
-        {currentView === 'dashboard' && <Dashboard />}
-        {currentView === 'ataCreator' && <AtaCreatorView initialAta={ataToView} onAtaViewed={handleAtaViewed} companyProfiles={companyProfiles} currentCompanyName={currentCompanyName} setToast={setToast} empreendimentos={empreendimentos} />}
-        {currentView === 'ataRepository' && <AtaRepositoryView onNavigateToAta={handleNavigateToAta} />}
-        {currentView === 'deadlinePanel' && <DeadlineView onNavigateToAta={handleNavigateToAta} adminSettings={adminSettings} webhooks={webhooks} />}
+        {currentView === 'generalDashboard' && <GeneralDashboardView onNavigateToAta={(ata) => handleNavigateToAta(ata, 'view')} />}
+        {currentView === 'ataDashboard' && <Dashboard />}
+        {currentView === 'ataCreator' && <AtaCreatorView initialAta={ataToView} onAtaViewed={handleAtaViewed} companyProfiles={companyProfiles} currentCompanyName={currentCompanyName} setToast={setToast} empreendimentos={empreendimentos} initialMode={ataInitialMode} />}
+        {currentView === 'ataRepository' && <AtaRepositoryView onNavigateToAta={(ata) => handleNavigateToAta(ata, 'edit')} />}
+        {currentView === 'deadlinePanel' && <DeadlineView onNavigateToAta={(ata) => handleNavigateToAta(ata, 'edit')} adminSettings={adminSettings} webhooks={webhooks} />}
         {currentView === 'projectControl' && <ProjectControlView setToast={setToast} projetistas={projetistas} empreendimentos={empreendimentos} />}
         {currentView === 'projectDashboard' && <ProjectDashboardView />}
         {currentView === 'settings' && <SettingsView 

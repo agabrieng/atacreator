@@ -411,7 +411,7 @@ const Dashboard: React.FC = () => {
   return (
     <div className="p-4 md:p-8 space-y-8">
         <header>
-            <h1 className="text-3xl font-bold text-slate-800 dark:text-slate-100">Dashboard</h1>
+            <h1 className="text-3xl font-bold text-slate-800 dark:text-slate-100">ATA DASHBOARD</h1>
             <p className="text-slate-500 dark:text-slate-400">Visão geral das suas atas e tarefas.</p>
         </header>
 
