@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { getProjetos } from '../services/firebaseService';
+import { getProjetistas, getProjetos } from '../services/firebaseService';
 import { getAllTasks } from '../services/taskService';
-import type { AtaData, Projeto, ProjectStatus, Task } from '../types';
+import type { AtaData, Projeto, ProjectStatus, Task, Projetista } from '../types';
 import { LayoutDashboardIcon, AlertTriangleIcon, TargetIcon, BriefcaseIcon, CalendarCheckIcon, PieChartIcon, XIcon } from './icons';
 import MinutesDisplay from './MinutesDisplay';
 
@@ -140,6 +140,7 @@ type CombinedItem = {
 const GeneralDashboardView: React.FC<{ onNavigateToAta: (ata: AtaData) => void; }> = ({ onNavigateToAta }) => {
     const [tasks, setTasks] = useState<Task[]>([]);
     const [projects, setProjects] = useState<Projeto[]>([]);
+    const [projetistas, setProjetistas] = useState<Projetista[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [viewingAta, setViewingAta] = useState<AtaData | null>(null);
@@ -149,9 +150,14 @@ const GeneralDashboardView: React.FC<{ onNavigateToAta: (ata: AtaData) => void; 
             setIsLoading(true);
             setError(null);
             try {
-                const [loadedTasks, loadedProjects] = await Promise.all([getAllTasks(), getProjetos()]);
+                const [loadedTasks, loadedProjects, loadedProjetistas] = await Promise.all([
+                    getAllTasks(), 
+                    getProjetos(),
+                    getProjetistas()
+                ]);
                 setTasks(loadedTasks);
                 setProjects(loadedProjects);
+                setProjetistas(loadedProjetistas);
             } catch (err: any) {
                 setError(`Falha ao carregar dados: ${err.message}`);
             } finally {
@@ -160,6 +166,10 @@ const GeneralDashboardView: React.FC<{ onNavigateToAta: (ata: AtaData) => void; 
         };
         fetchData();
     }, []);
+
+    const projetistaMap = useMemo(() => {
+        return new Map(projetistas.map(p => [p.id, p]));
+    }, [projetistas]);
 
     const stats = useMemo(() => {
         const today = new Date();
@@ -220,25 +230,36 @@ const GeneralDashboardView: React.FC<{ onNavigateToAta: (ata: AtaData) => void; 
         return <div className="flex flex-col items-center justify-center h-full text-center p-4"><AlertTriangleIcon className="w-16 h-16 mb-4 text-red-500" /><h3 className="text-xl font-semibold mb-3">Ocorreu um Erro</h3><p className="max-w-md">{error}</p></div>;
     }
 
-    const renderFocusItem = (item: CombinedItem) => (
-        <div key={item.id} className="flex items-start space-x-3 p-3 bg-slate-50 dark:bg-slate-800/50 rounded-lg">
-            <div className={`mt-1 w-5 h-5 rounded-full flex-shrink-0 ${item.type === 'task' ? 'bg-blue-500' : 'bg-green-500'}`} title={item.type === 'task' ? 'Tarefa de ATA' : 'Projeto de Entregáveis'}></div>
-            <div>
-                <p className="text-sm font-semibold text-slate-800 dark:text-slate-200 leading-tight">{item.description}</p>
-                <div className="text-xs text-slate-500 dark:text-slate-400 flex items-center flex-wrap">
-                    <span>{item.empreendimento} &bull; </span>
-                    <span className={`font-semibold ml-1 ${item.type === 'task' ? 'text-blue-600 dark:text-blue-400' : 'text-green-600 dark:text-green-400'}`}>
-                        {item.type === 'task' ? 'Tarefa de ATA' : 'Projeto de Entregáveis'}
-                    </span>
-                    {item.type === 'task' && 
-                        <button onClick={() => setViewingAta((item.data as Task).originalAta)} className="ml-2 text-blue-500 hover:underline">
-                            Ver ATA
-                        </button>
-                    }
+    const renderFocusItem = (item: CombinedItem) => {
+        const projetistaName = item.type === 'project' 
+            ? projetistaMap.get((item.data as Projeto).projetistaId)?.name
+            : null;
+
+        return (
+            <div key={item.id} className="flex items-start space-x-3 p-3 bg-slate-50 dark:bg-slate-800/50 rounded-lg">
+                <div className={`mt-1 w-5 h-5 rounded-full flex-shrink-0 ${item.type === 'task' ? 'bg-blue-500' : 'bg-green-500'}`} title={item.type === 'task' ? 'Tarefa de ATA' : 'Projeto de Entregáveis'}></div>
+                <div>
+                    <p className="text-sm font-semibold text-slate-800 dark:text-slate-200 leading-tight">{item.description}</p>
+                    <div className="text-xs text-slate-500 dark:text-slate-400 flex items-center flex-wrap">
+                        <span>{item.empreendimento} &bull; </span>
+                        {item.type === 'task' ? (
+                            <>
+                                <span className="font-semibold ml-1 text-blue-600 dark:text-blue-400">Tarefa de ATA</span>
+                                <button onClick={() => setViewingAta((item.data as Task).originalAta)} className="ml-2 text-blue-500 hover:underline">Ver ATA</button>
+                            </>
+                        ) : (
+                            <>
+                                <span className="font-semibold ml-1 text-green-600 dark:text-green-400">
+                                    Projeto de Entregáveis
+                                </span>
+                                {projetistaName && <span className="ml-1">- {projetistaName}</span>}
+                            </>
+                        )}
+                    </div>
                 </div>
             </div>
-        </div>
-    );
+        );
+    };
 
     return (
         <>
