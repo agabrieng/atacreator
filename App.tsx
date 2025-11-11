@@ -1,9 +1,5 @@
-
-
-
-
 import React, { useState, useCallback, useEffect, useMemo } from 'react';
-import type { AtaData, AdminSettings, Participant, PautaItem, Empreendimento, Webhook, Projetista } from './types';
+import type { AtaData, AdminSettings, Participant, PautaItem, Empreendimento, Webhook, Projetista, Task } from './types';
 import { generateAtaData } from './services/geminiService';
 import { 
     saveAtaToFirebase, 
@@ -50,6 +46,8 @@ const DEFAULT_SETTINGS: AdminSettings = {
 };
 
 type View = 'generalDashboard' | 'ataDashboard' | 'ataCreator' | 'ataRepository' | 'deadlinePanel' | 'settings' | 'projectControl' | 'projectDashboard';
+export type ItemToHighlight = { type: 'task' | 'project'; id: string } | null;
+
 
 const ActionButton: React.FC<{
     onClick?: () => void;
@@ -555,13 +553,17 @@ const DeadlineView: React.FC<{
     onNavigateToAta: (ata: AtaData) => void;
     adminSettings: AdminSettings | null;
     webhooks: Webhook[];
-}> = ({ onNavigateToAta, adminSettings, webhooks }) => {
+    itemToHighlight: ItemToHighlight;
+    clearHighlight: () => void;
+}> = ({ onNavigateToAta, adminSettings, webhooks, itemToHighlight, clearHighlight }) => {
     return (
         <main className="container mx-auto p-4 md:p-8 h-full">
             <DeadlinePanel
                 onSelectAta={onNavigateToAta}
                 adminSettings={adminSettings}
                 webhooks={webhooks}
+                itemToHighlight={itemToHighlight}
+                clearHighlight={clearHighlight}
             />
         </main>
     );
@@ -712,6 +714,8 @@ const App: React.FC = () => {
   const [projetistas, setProjetistas] = useState<Projetista[]>([]);
   const [empreendimentos, setEmpreendimentos] = useState<Empreendimento[]>([]);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+  const [itemToHighlight, setItemToHighlight] = useState<ItemToHighlight>(null);
+
 
   useEffect(() => {
     // Load company profiles from localStorage
@@ -894,6 +898,15 @@ const App: React.FC = () => {
   const handleAtaViewed = () => {
     setAtaToView(null);
   }
+
+  const handleHighlightItem = (type: 'task' | 'project', id: string) => {
+    setItemToHighlight({ type, id });
+    if (type === 'task') {
+      setCurrentView('deadlinePanel');
+    } else if (type === 'project') {
+      setCurrentView('projectControl');
+    }
+  };
   
   const adminSettings = companyProfiles[currentCompanyName] || null;
 
@@ -907,12 +920,12 @@ const App: React.FC = () => {
       />
       <div className={`flex-1 w-full transition-all duration-300 ease-in-out ${isSidebarCollapsed ? 'pl-20' : 'pl-64'}`}>
         {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
-        {currentView === 'generalDashboard' && <GeneralDashboardView onNavigateToAta={(ata) => handleNavigateToAta(ata, 'view')} />}
+        {currentView === 'generalDashboard' && <GeneralDashboardView onNavigateToAta={(ata) => handleNavigateToAta(ata, 'view')} onHighlightItem={handleHighlightItem} />}
         {currentView === 'ataDashboard' && <Dashboard />}
         {currentView === 'ataCreator' && <AtaCreatorView initialAta={ataToView} onAtaViewed={handleAtaViewed} companyProfiles={companyProfiles} currentCompanyName={currentCompanyName} setToast={setToast} empreendimentos={empreendimentos} initialMode={ataInitialMode} />}
         {currentView === 'ataRepository' && <AtaRepositoryView onNavigateToAta={(ata) => handleNavigateToAta(ata, 'edit')} />}
-        {currentView === 'deadlinePanel' && <DeadlineView onNavigateToAta={(ata) => handleNavigateToAta(ata, 'edit')} adminSettings={adminSettings} webhooks={webhooks} />}
-        {currentView === 'projectControl' && <ProjectControlView setToast={setToast} projetistas={projetistas} empreendimentos={empreendimentos} />}
+        {currentView === 'deadlinePanel' && <DeadlineView onNavigateToAta={(ata) => handleNavigateToAta(ata, 'edit')} adminSettings={adminSettings} webhooks={webhooks} itemToHighlight={itemToHighlight} clearHighlight={() => setItemToHighlight(null)} />}
+        {currentView === 'projectControl' && <ProjectControlView setToast={setToast} projetistas={projetistas} empreendimentos={empreendimentos} itemToHighlight={itemToHighlight} clearHighlight={() => setItemToHighlight(null)} />}
         {currentView === 'projectDashboard' && <ProjectDashboardView />}
         {currentView === 'settings' && <SettingsView 
             allProfiles={companyProfiles} 

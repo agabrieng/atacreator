@@ -1,15 +1,18 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import type { AtaData, Task, GroupedTasks, AdminSettings, Webhook } from '../types';
 import { getAllTasks, groupTasksByResponsible, getTaskStatus } from '../services/taskService';
 import { saveAtaToFirebase } from '../services/firebaseService';
 import { generateDailyBulletinHtml, generateTeamsHtml, generateTeamsAdaptiveCard } from '../services/emailService';
 import { sendToTeamsWebhook } from '../services/webhookService';
 import { XIcon, AlertTriangleIcon, CalendarCheckIcon, ChevronRightIcon, ExternalLinkIcon, SparklesIcon, CopyIcon, CheckIcon, UsersIcon, SendIcon } from './icons';
+import type { ItemToHighlight } from '../App';
 
 interface DeadlinePanelProps {
   onSelectAta: (ata: AtaData) => void;
   adminSettings: AdminSettings | null;
   webhooks: Webhook[];
+  itemToHighlight: ItemToHighlight;
+  clearHighlight: () => void;
 }
 
 const statusStyles = {
@@ -358,7 +361,7 @@ const BulletinFilterModal: React.FC<{
 };
 
 
-const DeadlinePanel: React.FC<DeadlinePanelProps> = ({ onSelectAta, adminSettings, webhooks }) => {
+const DeadlinePanel: React.FC<DeadlinePanelProps> = ({ onSelectAta, adminSettings, webhooks, itemToHighlight, clearHighlight }) => {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -375,6 +378,8 @@ const DeadlinePanel: React.FC<DeadlinePanelProps> = ({ onSelectAta, adminSetting
   const [selectedPeriod, setSelectedPeriod] = useState<string>('current_week');
   const [customStartDate, setCustomStartDate] = useState('');
   const [customEndDate, setCustomEndDate] = useState('');
+  const taskRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  const [pendingHighlightId, setPendingHighlightId] = useState<string | null>(null);
 
 
   const fetchAndSetTasks = async () => {
@@ -394,6 +399,71 @@ const DeadlinePanel: React.FC<DeadlinePanelProps> = ({ onSelectAta, adminSetting
   useEffect(() => {
     fetchAndSetTasks();
   }, []);
+  
+  const toggleExpand = (key: string) => {
+    setExpandedKeys(prev => ({ ...prev, [key]: !prev[key] }));
+  };
+
+  // Effect 1: Trigger expansion and set pending ID when itemToHighlight changes.
+  useEffect(() => {
+    if (itemToHighlight?.type === 'task') {
+      const task = tasks.find(t => t.id === itemToHighlight.id);
+      if (task) {
+        const responsibleKey = task.responsible || 'Não atribuído';
+        
+        // Set the ID that we need to highlight, regardless of expansion state.
+        setPendingHighlightId(itemToHighlight.id);
+
+        // If the accordion for this task is not already open, trigger it.
+        if (!expandedKeys[responsibleKey]) {
+          toggleExpand(responsibleKey);
+        }
+      } else if (!isLoading) {
+        // If task not found after loading, clear the highlight request.
+        clearHighlight();
+      }
+    }
+  }, [itemToHighlight, tasks, isLoading]); // Re-run if tasks load after highlight is set.
+
+  // Effect 2: Perform scroll/highlight after a re-render, once conditions are met.
+  useEffect(() => {
+    // Only proceed if there's a pending highlight ID and data has loaded.
+    if (pendingHighlightId && !isLoading) {
+      const task = tasks.find(t => t.id === pendingHighlightId);
+      if (!task) {
+        setPendingHighlightId(null); // Clean up if task disappears
+        return;
+      }
+      
+      const responsibleKey = task.responsible || 'Não atribuído';
+      const taskElement = taskRefs.current[pendingHighlightId];
+
+      // CRUCIAL CHECK: Is the accordion for this task expanded AND is the element rendered in the DOM?
+      if (expandedKeys[responsibleKey] && taskElement) {
+        
+        // Use a small timeout to allow the browser to paint the expanded content before scrolling.
+        const scrollTimer = setTimeout(() => {
+            taskElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            taskElement.classList.add('highlight-animation');
+    
+            const animationTimer = setTimeout(() => {
+              taskElement.classList.remove('highlight-animation');
+            }, 2000);
+
+            // Return cleanup for inner timer
+            return () => clearTimeout(animationTimer);
+        }, 50);
+
+        // Clean up state to prevent this from re-running unnecessarily.
+        setPendingHighlightId(null);
+        clearHighlight();
+
+        // Return cleanup for outer timer
+        return () => clearTimeout(scrollTimer);
+      }
+    }
+  }, [pendingHighlightId, expandedKeys, tasks, isLoading, clearHighlight]);
+
 
   const nonCompletedTasks = useMemo(() => {
     return tasks.filter(task => !task.completed);
@@ -489,10 +559,6 @@ const DeadlinePanel: React.FC<DeadlinePanelProps> = ({ onSelectAta, adminSetting
         completionDate: convertToDisplayDate(newDate),
     });
   }
-
-  const toggleExpand = (key: string) => {
-    setExpandedKeys(prev => ({ ...prev, [key]: !prev[key] }));
-  };
   
   const handleGenerateBulletin = () => {
     let tasksForBulletin = tasks.filter(task => !task.completed);
@@ -673,7 +739,11 @@ const DeadlinePanel: React.FC<DeadlinePanelProps> = ({ onSelectAta, adminSetting
                             {expandedKeys[responsible] && (
                             <div className="p-2 space-y-2">
                                 {filteredTasks.map(task => (
-                                <div key={task.id} className={`p-3 rounded-lg border transition-colors ${task.completed ? 'bg-slate-50 dark:bg-slate-700/40 border-slate-200 dark:border-slate-600' : 'bg-white dark:bg-slate-700/60 border-slate-200 dark:border-slate-600'}`}>
+                                <div 
+                                    key={task.id} 
+                                    ref={el => taskRefs.current[task.id] = el}
+                                    className={`p-3 rounded-lg border transition-colors ${task.completed ? 'bg-slate-50 dark:bg-slate-700/40 border-slate-200 dark:border-slate-600' : 'bg-white dark:bg-slate-700/60 border-slate-200 dark:border-slate-600'}`}
+                                >
                                     <div className="flex items-start gap-3">
                                         <input type="checkbox" checked={task.completed} onChange={() => handleToggleCompletion(task)} className="mt-1 h-5 w-5 rounded border-slate-300 text-blue-600 focus:ring-blue-500" />
                                         <div className="flex-grow">

@@ -4,6 +4,9 @@ import { getAllTasks } from '../services/taskService';
 import type { AtaData, Projeto, ProjectStatus, Task, Projetista } from '../types';
 import { LayoutDashboardIcon, AlertTriangleIcon, TargetIcon, BriefcaseIcon, CalendarCheckIcon, PieChartIcon, XIcon } from './icons';
 import MinutesDisplay from './MinutesDisplay';
+import TimelineGanttChart from './TimelineGanttChart';
+import type { ItemToHighlight } from '../App';
+
 
 const getProjectStatusWithOverdueCheck = (status: ProjectStatus, deadline: string): ProjectStatus => {
     if (status === 'completed') {
@@ -137,7 +140,10 @@ type CombinedItem = {
     data: Task | Projeto;
 };
 
-const GeneralDashboardView: React.FC<{ onNavigateToAta: (ata: AtaData) => void; }> = ({ onNavigateToAta }) => {
+const GeneralDashboardView: React.FC<{ 
+    onNavigateToAta: (ata: AtaData) => void;
+    onHighlightItem: (type: 'task' | 'project', id: string) => void;
+}> = ({ onNavigateToAta, onHighlightItem }) => {
     const [tasks, setTasks] = useState<Task[]>([]);
     const [projects, setProjects] = useState<Projeto[]>([]);
     const [projetistas, setProjetistas] = useState<Projetista[]>([]);
@@ -274,6 +280,10 @@ const GeneralDashboardView: React.FC<{ onNavigateToAta: (ata: AtaData) => void; 
                     <StatCard title="Projetos Ativos" value={stats.activeProjects} icon={BriefcaseIcon} color="bg-blue-500" />
                     <StatCard title="Total de Itens Atrasados" value={stats.totalOverdue} icon={AlertTriangleIcon} color="bg-red-500" />
                     <StatCard title="Entregas (Próximos 7 Dias)" value={stats.deliveriesNext7Days} icon={CalendarCheckIcon} color="bg-green-500" />
+                </div>
+                
+                <div className="grid grid-cols-1 gap-6">
+                    <TimelineGanttChart tasks={tasks} projects={projects} onItemClick={onHighlightItem} />
                 </div>
 
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-stretch">

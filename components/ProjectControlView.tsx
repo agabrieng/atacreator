@@ -1,9 +1,11 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { getProjetos, addProjeto, updateProjeto, deleteProjeto } from '../services/firebaseService';
 import type { Projetista, Projeto, ProjectStatus, Disciplina, Empreendimento } from '../types';
 import { disciplinas } from '../types';
 import { BriefcaseIcon, AlertTriangleIcon, ChevronRightIcon, PlusIcon, EditIcon, TrashIcon, XIcon, SearchIcon, FilterIcon } from './icons';
 import ConfirmationDialog from './ConfirmationDialog';
+import type { ItemToHighlight } from '../App';
+
 
 // Define a type for the toast function prop for better type safety.
 type ToastFunc = (toast: { message: string; type: 'success' | 'error' } | null) => void;
@@ -28,10 +30,18 @@ const getStatusWithOverdueCheck = (status: ProjectStatus, deadline: string): Pro
     return status;
 }
 
-const ProjectControlView: React.FC<{ setToast: ToastFunc; projetistas: Projetista[], empreendimentos: Empreendimento[] }> = ({ setToast, projetistas, empreendimentos }) => {
+const ProjectControlView: React.FC<{ 
+    setToast: ToastFunc; 
+    projetistas: Projetista[], 
+    empreendimentos: Empreendimento[],
+    itemToHighlight: ItemToHighlight;
+    clearHighlight: () => void;
+}> = ({ setToast, projetistas, empreendimentos, itemToHighlight, clearHighlight }) => {
     const [projetos, setProjetos] = useState<Projeto[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    const projectRefs = useRef<Record<string, HTMLDivElement | null>>({});
+
     
     // Filter states
     const [searchQuery, setSearchQuery] = useState('');
@@ -46,6 +56,7 @@ const ProjectControlView: React.FC<{ setToast: ToastFunc; projetistas: Projetist
     const [manualExpandedKeys, setManualExpandedKeys] = useState<Record<string, boolean>>({});
     // State for what is actually displayed as expanded/collapsed
     const [displayExpandedKeys, setDisplayExpandedKeys] = useState<Record<string, boolean>>({});
+    const [pendingHighlightId, setPendingHighlightId] = useState<string | null>(null);
 
 
     // Modal/Form State
@@ -82,11 +93,6 @@ const ProjectControlView: React.FC<{ setToast: ToastFunc; projetistas: Projetist
     useEffect(() => {
         fetchData();
     }, []);
-
-    const toggleExpand = (key: string) => {
-        // When user toggles, always update the manual state
-        setManualExpandedKeys(prev => ({ ...prev, [key]: !prev[key] }));
-    };
 
     const projetistaMap = useMemo(() => {
         return new Map(projetistas.map(p => [p.id, p]));
@@ -134,7 +140,34 @@ const ProjectControlView: React.FC<{ setToast: ToastFunc; projetistas: Projetist
         });
     }, [projetos, searchQuery, selectedEmpreendimento, selectedProjetista, selectedDisciplina, selectedStatus, startDate, endDate, projetistaMap]);
 
-    // Update display state based on filtering or manual changes
+    // Effect 1: Trigger expansion and set pending ID when itemToHighlight changes.
+    useEffect(() => {
+        if (itemToHighlight?.type === 'project') {
+            const project = projetos.find(p => p.id === itemToHighlight.id);
+            if (project) {
+                // Set the ID that we need to highlight later.
+                setPendingHighlightId(itemToHighlight.id);
+
+                // Determine all keys needed for expansion.
+                const empKey = `emp-${project.empreendimento}`;
+                const projKey = `${empKey}_proj-${project.projetistaId}`;
+                const discKey = `${projKey}_disc-${project.disciplina}`;
+                
+                // Trigger expansion for all necessary accordions.
+                setManualExpandedKeys(prev => ({
+                    ...prev,
+                    [empKey]: true,
+                    [projKey]: true,
+                    [discKey]: true,
+                }));
+            } else if (!isLoading) {
+                // Project not found after loading, clean up.
+                clearHighlight();
+            }
+        }
+    }, [itemToHighlight, projetos, isLoading]);
+
+    // Effect 2: Sync manual/filter state to the actual display state.
     useEffect(() => {
         if (isFiltering) {
             const keysToExpand: Record<string, boolean> = {};
@@ -150,11 +183,53 @@ const ProjectControlView: React.FC<{ setToast: ToastFunc; projetistas: Projetist
             }
             setDisplayExpandedKeys(keysToExpand);
         } else {
-            // When not filtering, reflect the user's manual choices
             setDisplayExpandedKeys(manualExpandedKeys);
         }
     }, [isFiltering, filteredProjetos, manualExpandedKeys]);
 
+    // Effect 3: Perform scroll/highlight after a re-render, based on pending ID and display state.
+    useEffect(() => {
+        // Only proceed if there's a pending highlight and data has loaded.
+        if (pendingHighlightId && !isLoading) {
+            const project = projetos.find(p => p.id === pendingHighlightId);
+            if (!project) {
+                setPendingHighlightId(null); // Clean up if project disappears
+                return;
+            }
+            
+            const projectElement = projectRefs.current[pendingHighlightId];
+            const empKey = `emp-${project.empreendimento}`;
+            const projKey = `${empKey}_proj-${project.projetistaId}`;
+            const discKey = `${projKey}_disc-${project.disciplina}`;
+
+            // CRUCIAL CHECK: Are all accordions expanded in the display state AND is the element rendered?
+            if (displayExpandedKeys[empKey] && displayExpandedKeys[projKey] && displayExpandedKeys[discKey] && projectElement) {
+                
+                // A small timeout helps ensure the browser has painted the expanded content before scrolling.
+                const scrollTimer = setTimeout(() => {
+                    projectElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    projectElement.classList.add('highlight-animation');
+            
+                    const animationTimer = setTimeout(() => {
+                        projectElement.classList.remove('highlight-animation');
+                    }, 2000);
+                    
+                    return () => clearTimeout(animationTimer);
+                }, 100);
+
+                // Clean up state to prevent re-running.
+                setPendingHighlightId(null);
+                clearHighlight();
+                
+                return () => clearTimeout(scrollTimer);
+            }
+        }
+    }, [pendingHighlightId, displayExpandedKeys, projetos, isLoading, clearHighlight]);
+
+
+    const toggleExpand = (key: string) => {
+        setManualExpandedKeys(prev => ({ ...prev, [key]: !prev[key] }));
+    };
 
     // Fix: Changed interface to a type alias with Record to improve type inference.
     type GroupedData = Record<string, Record<string, Record<string, Projeto[]>>>;
@@ -187,8 +262,6 @@ const ProjectControlView: React.FC<{ setToast: ToastFunc; projetistas: Projetist
         setSelectedStatus('all');
         setStartDate('');
         setEndDate('');
-        // No need to touch expansion state here, the useEffect will handle it
-        // because `isFiltering` will become false, reverting to manualExpandedKeys.
     };
 
     // Handlers for Projetos
@@ -390,7 +463,11 @@ const ProjectControlView: React.FC<{ setToast: ToastFunc; projetistas: Projetist
                                                                                     const currentStatus = getStatusWithOverdueCheck(proj.status, proj.deadline);
                                                                                     const statusInfo = statusConfig[currentStatus];
                                                                                     return (
-                                                                                        <div key={proj.id} className="grid grid-cols-[1fr,auto] gap-4 items-start p-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-sm">
+                                                                                        <div 
+                                                                                            key={proj.id} 
+                                                                                            ref={el => projectRefs.current[proj.id] = el}
+                                                                                            className="grid grid-cols-[1fr,auto] gap-4 items-start p-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-sm"
+                                                                                        >
                                                                                             <div>
                                                                                                 <p className="font-semibold text-slate-800 dark:text-slate-200">{proj.name}</p>
                                                                                                 <div className="mt-2 text-xs text-slate-500 dark:text-slate-400 grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-1">

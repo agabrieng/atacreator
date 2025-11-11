@@ -24,6 +24,13 @@
       .animate-fade-in-down {
         animation: fade-in-down 0.4s ease-out forwards;
       }
+      @keyframes highlight {
+        from { background-color: rgba(59, 130, 246, 0.4); } /* blue-500 with opacity */
+        to { background-color: transparent; }
+      }
+      .highlight-animation {
+        animation: highlight 2s ease-out;
+      }
     </style>
   <script type="importmap">
 {
