@@ -172,21 +172,12 @@ const onePageReportSchema = {
         },
         analiseRiscos: { type: Type.ARRAY, items: { type: Type.STRING }, description: "Uma lista bullet-point de novos riscos, impedimentos ou problemas identificados nas reuniões."},
         recomendacoes: { type: Type.ARRAY, items: { type: Type.STRING }, description: "Uma lista bullet-point de 2 a 3 ações recomendadas para a gestão, com base na análise dos dados. Ex: 'Focar no desbloqueio do Projeto X', 'Realinhar prazos da equipe Y'."},
-        porDentroDasReunioes: {
-            type: Type.ARRAY,
-            description: "Uma lista de resumos contextuais para cada reunião analisada no período. O resumo deve capturar a essência da discussão de forma concisa e alinhada com as outras seções do relatório.",
-            items: {
-                type: Type.OBJECT,
-                properties: {
-                    data: { type: Type.STRING, description: "A data da reunião, no formato 'DD/MM/YYYY'."},
-                    titulo: { type: Type.STRING, description: "O título ou assunto principal da reunião."},
-                    resumo: { type: Type.STRING, description: "O resumo contextualizado da reunião gerado pela IA, com excelente interpretação e em sincronia com as demais seções do OnePage."}
-                },
-                required: ["data", "titulo", "resumo"],
-            }
+        visaoGeralDasReunioes: {
+            type: Type.STRING,
+            description: "Um resumo geral consolidado de todos os principais tópicos discutidos nas reuniões do período, focando nos temas que norteiam e dão contexto às outras seções do relatório. Deve ser um texto coeso em formato de parágrafo ou lista com marcadores."
         },
     },
-    required: ["periodo", "sumarioExecutivo", "principaisDecisoes", "acoesCriticas", "projetosConcluidos", "projetosEmRisco", "analiseRiscos", "recomendacoes", "porDentroDasReunioes"],
+    required: ["periodo", "sumarioExecutivo", "principaisDecisoes", "acoesCriticas", "projetosConcluidos", "projetosEmRisco", "analiseRiscos", "recomendacoes", "visaoGeralDasReunioes"],
 };
 
 
@@ -250,7 +241,7 @@ export const generateOnePageReport = async (atas: AtaData[], projetos: Projeto[]
     7.  **projetosEmRisco:** Identifique os projetos com status 'overdue' (atrasado) ou 'in-progress' mas cujo prazo está muito próximo e parece haver problemas mencionados nas atas. Forneça um motivo conciso para o risco.
     8.  **analiseRiscos:** Com base nas 'observacoes' das atas e nos atrasos dos projetos, sintetize os principais riscos e impedimentos que surgiram ou se agravaram no período.
     9.  **recomendacoes:** Com base em toda a sua análise, forneça 2-3 recomendações acionáveis para a gestão. O que eles deveriam fazer na próxima semana para mitigar riscos e garantir o progresso?
-    10. **porDentroDasReunioes (Por dentro das reuniões):** Para cada ata fornecida em 'Atas de Reunião do Período', crie um resumo contextual. Analise o conteúdo (pauta, observações) e sintetize a discussão em um parágrafo coeso e de fácil interpretação. O resumo deve dar uma visão clara do que foi tratado, quais foram os pontos de atenção e o sentimento geral daquela reunião específica, mantendo sincronia com as demais seções do relatório. Para cada resumo, inclua a data e o título/assunto da respectiva reunião.
+    10. **visaoGeralDasReunioes (Visão Geral das Reuniões):** Analise o conteúdo de TODAS as atas fornecidas e crie um único resumo consolidado. Este resumo deve destacar os principais temas, discussões e pontos de atenção que permearam as reuniões no período, fornecendo um contexto geral para as decisões, ações e riscos listados nas outras seções do relatório. Formate como um ou mais parágrafos de texto coeso. Não liste resumos por reunião individual.
 
 
     **FORMATO DE SAÍDA:** Preencha o schema JSON fornecido com a sua análise. Seja sucinto, profissional e use linguagem de negócios.

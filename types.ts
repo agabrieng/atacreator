@@ -158,12 +158,6 @@ export interface IbgeCity {
 }
 
 // --- Type for One Page Report ---
-export interface MeetingSummary {
-  data: string;
-  titulo: string;
-  resumo: string;
-}
-
 export interface OnePageReportData {
   periodo: string;
   empreendimento?: string;
@@ -174,5 +168,5 @@ export interface OnePageReportData {
   projetosEmRisco: { nome:string; motivo: string; prazo: string }[];
   analiseRiscos: string[];
   recomendacoes: string[];
-  porDentroDasReunioes: MeetingSummary[];
+  visaoGeralDasReunioes: string;
 }

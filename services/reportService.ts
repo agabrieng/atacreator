@@ -112,16 +112,13 @@ export const exportOnePageToPdf = async (reportData: OnePageReportData, adminSet
     (doc as any).autoTable({ ...autoTableOptions, startY: lastY, body: [[reportData.sumarioExecutivo]], theme: 'plain', styles: { fontSize: 10 } });
     lastY = (doc as any).autoTable.previous.finalY + 8;
 
-    // --- Por dentro das reuniões ---
-    if (reportData.porDentroDasReunioes?.length > 0) {
-        addSectionTitle('Por dentro das reuniões');
+    // --- Visão Geral das Reuniões ---
+    if (reportData.visaoGeralDasReunioes) {
+        addSectionTitle('Visão Geral das Reuniões');
         (doc as any).autoTable({
             ...autoTableOptions,
             startY: lastY,
-            body: reportData.porDentroDasReunioes.flatMap(reuniao => [
-                [{ content: `${reuniao.data} - ${reuniao.titulo}`, styles: { fontStyle: 'bold', cellPadding: { top: 3, bottom: 1 } } }],
-                [{ content: reuniao.resumo, styles: { cellPadding: { top: 1, bottom: 5 } } }],
-            ]),
+            body: [[reportData.visaoGeralDasReunioes]],
             theme: 'plain',
             styles: { fontSize: 10 },
         });
@@ -241,14 +238,11 @@ export const generateOnePageHtmlForEmail = (reportData: OnePageReportData, admin
             
             ${section('Sumário Executivo', `<p style="line-height: 1.6; font-size: 14px; color: #34495e;">${reportData.sumarioExecutivo}</p>`)}
             
-            ${reportData.porDentroDasReunioes && reportData.porDentroDasReunioes.length > 0 ? 
-                section('Por dentro das reuniões', 
-                    reportData.porDentroDasReunioes.map(reuniao => `
-                        <div style="margin-bottom: 12px; padding: 10px; background-color: #ecf0f1; border-radius: 4px;">
-                            <p style="margin: 0 0 5px 0; font-size: 13px; font-weight: bold; color: #2c3e50;">${reuniao.data} - ${reuniao.titulo}</p>
-                            <p style="margin: 0; line-height: 1.5; font-size: 13px; color: #34495e;">${reuniao.resumo}</p>
-                        </div>
-                    `).join('')
+            ${reportData.visaoGeralDasReunioes ?
+                section('Visão Geral das Reuniões',
+                    `<div style="margin-bottom: 12px; padding: 10px; background-color: #ecf0f1; border-radius: 4px;">
+                        <p style="margin: 0; line-height: 1.5; font-size: 13px; color: #34495e;">${reportData.visaoGeralDasReunioes.replace(/\n/g, '<br />')}</p>
+                    </div>`
                 ) : ''
             }
 
@@ -298,19 +292,17 @@ export const generateOnePageAdaptiveCard = (reportData: OnePageReportData, admin
         ...section('Sumário Executivo', [{ type: 'TextBlock', text: reportData.sumarioExecutivo, wrap: true }]),
     ];
 
-    if (reportData.porDentroDasReunioes && reportData.porDentroDasReunioes.length > 0) {
-        const meetingSummaries = reportData.porDentroDasReunioes.map(reuniao => (
+    if (reportData.visaoGeralDasReunioes) {
+        body.push(...section('Visão Geral das Reuniões', [
             {
                 type: 'Container',
                 style: 'emphasis',
                 items: [
-                    { type: 'TextBlock', text: `${reuniao.data} - ${reuniao.titulo}`, weight: 'bolder', wrap: true },
-                    { type: 'TextBlock', text: reuniao.resumo, wrap: true, spacing: 'small' }
+                    { type: 'TextBlock', text: reportData.visaoGeralDasReunioes, wrap: true }
                 ],
                 separator: true
             }
-        ));
-        body.push(...section('Por dentro das reuniões', meetingSummaries));
+        ]));
     }
 
     if (reportData.principaisDecisoes.length > 0) {
