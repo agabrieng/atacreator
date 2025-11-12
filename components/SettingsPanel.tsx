@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import type { AdminSettings } from '../types';
+import type { AdminSettings, DocumentSettings } from '../types';
 import { CameraIcon, XIcon, TrashIcon } from './icons';
 
 interface SettingsPanelProps {
@@ -12,11 +12,48 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ allProfiles, currentCompa
   const [selectedCompany, setSelectedCompany] = useState(currentCompanyName);
   const [isCreating, setIsCreating] = useState(false);
   const [newCompanyName, setNewCompanyName] = useState('');
-  const [currentSettings, setCurrentSettings] = useState<AdminSettings>(allProfiles[currentCompanyName]);
+  const [currentSettings, setCurrentSettings] = useState<AdminSettings | null>(null);
+  const [activeDocType, setActiveDocType] = useState<'ata' | 'onepage'>('ata');
 
   useEffect(() => {
-    if(!isCreating) {
-        setCurrentSettings(allProfiles[selectedCompany]);
+    if (isCreating) {
+        setCurrentSettings({
+            companyName: '',
+            companyLogo: null,
+            documentSettings: {
+                ata: { title: 'ATA DE REUNIÃO', docNumber: '', revision: '', propertyInfo: '' },
+                onepage: { title: 'RELATÓRIO GERENCIAL ONEPAGE', docNumber: '', revision: '', propertyInfo: '' }
+            }
+        });
+        return;
+    }
+
+    const profile = allProfiles[selectedCompany];
+    if (profile) {
+        // Ensure settings are complete by merging with defaults
+        const ensuredSettings: AdminSettings = {
+            companyName: profile.companyName,
+            companyLogo: profile.companyLogo,
+            documentSettings: {
+                ata: { 
+                    title: 'ATA DE REUNIÃO', 
+                    docNumber: '', 
+                    revision: '', 
+                    propertyInfo: '', 
+                    ...profile.documentSettings?.ata 
+                },
+                onepage: { 
+                    title: 'RELATÓRIO GERENCIAL ONEPAGE',
+                    docNumber: '', 
+                    revision: '', 
+                    propertyInfo: '', 
+                    ...profile.documentSettings?.onepage 
+                },
+            }
+        };
+        setCurrentSettings(ensuredSettings);
+    } else {
+        setCurrentSettings(null);
     }
   }, [selectedCompany, allProfiles, isCreating]);
 
@@ -25,13 +62,6 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ allProfiles, currentCompa
     if (value === '__new__') {
       setIsCreating(true);
       setNewCompanyName('');
-      setCurrentSettings({
-        companyName: '',
-        companyLogo: null,
-        docNumber: '',
-        revision: '',
-        propertyInfo: ''
-      });
     } else {
       setIsCreating(false);
       setSelectedCompany(value);
@@ -39,6 +69,8 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ allProfiles, currentCompa
   };
 
   const handleSave = () => {
+    if (!currentSettings) return;
+
     let finalProfiles = { ...allProfiles };
     let finalCompanyName = selectedCompany;
 
@@ -66,7 +98,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ allProfiles, currentCompa
 
   const handleDelete = () => {
     if (Object.keys(allProfiles).length <= 1) {
-        alert("Você não pode excluir o único perfil de empresa.");
+        alert("Você не pode excluir o único perfil de empresa.");
         return;
     }
     if (window.confirm(`Tem certeza de que deseja excluir o perfil da empresa "${selectedCompany}"?`)) {
@@ -78,8 +110,19 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ allProfiles, currentCompa
     }
   };
 
-  const handleInputChange = (field: keyof Omit<AdminSettings, 'companyName' | 'companyLogo'>, value: string) => {
-    setCurrentSettings(prev => ({ ...prev, [field]: value }));
+  const handleInputChange = (field: keyof DocumentSettings, value: string) => {
+    setCurrentSettings(prev => {
+        if (!prev) return prev;
+        
+        const newSettings = { ...prev };
+        newSettings.documentSettings = { ...(newSettings.documentSettings || { ata: {} as DocumentSettings, onepage: {} as DocumentSettings }) };
+        newSettings.documentSettings[activeDocType] = { 
+            ...(newSettings.documentSettings[activeDocType] || {} as DocumentSettings),
+            [field]: value
+        };
+
+        return newSettings;
+    });
   };
 
   const handleLogoChange = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -87,18 +130,18 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ allProfiles, currentCompa
     if (file) {
       const reader = new FileReader();
       reader.onloadend = () => {
-        setCurrentSettings(prev => ({ ...prev, companyLogo: reader.result as string }));
+        setCurrentSettings(prev => (prev ? { ...prev, companyLogo: reader.result as string } : null));
       };
       reader.readAsDataURL(file);
     }
   };
   
   const handleRemoveLogo = () => {
-    setCurrentSettings(prev => ({ ...prev, companyLogo: null }));
+    setCurrentSettings(prev => (prev ? { ...prev, companyLogo: null } : null));
   };
 
   return (
-    <div className="bg-white dark:bg-slate-800 rounded-xl shadow-lg p-6 w-full space-y-4">
+    <div className="bg-white dark:bg-slate-800 rounded-xl shadow-lg p-6 w-full space-y-6">
       <h2 className="text-2xl font-bold text-slate-800 dark:text-slate-100">Perfis de Empresa</h2>
       
       <div className="space-y-2">
@@ -143,18 +186,38 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ allProfiles, currentCompa
               {currentSettings?.companyLogo && <button onClick={handleRemoveLogo} className="ml-2 text-xs text-red-500 hover:text-red-700">Remover</button>}
           </div>
       </div>
+        
+      <div className="pt-4 border-t border-slate-200 dark:border-slate-700">
+          <h3 className="text-lg font-semibold text-slate-700 dark:text-slate-300 mb-3">Configuração de Documentos</h3>
+          <div className="border-b border-slate-200 dark:border-slate-700 mb-4">
+              <nav className="-mb-px flex space-x-4" aria-label="Tabs">
+                  <button onClick={() => setActiveDocType('ata')} className={`whitespace-nowrap py-3 px-1 border-b-2 font-medium text-sm ${activeDocType === 'ata' ? 'border-blue-500 text-blue-600 dark:text-blue-400' : 'border-transparent text-slate-500 hover:text-slate-700 dark:text-slate-300 dark:hover:text-slate-200'}`}>
+                      Ata de Reunião
+                  </button>
+                  <button onClick={() => setActiveDocType('onepage')} className={`whitespace-nowrap py-3 px-1 border-b-2 font-medium text-sm ${activeDocType === 'onepage' ? 'border-blue-500 text-blue-600 dark:text-blue-400' : 'border-transparent text-slate-500 hover:text-slate-700 dark:text-slate-300 dark:hover:text-slate-200'}`}>
+                      Relatório OnePage
+                  </button>
+              </nav>
+          </div>
 
-      <div>
-          <label htmlFor="doc-number" className="block text-sm font-medium text-slate-600 dark:text-slate-300">Nº do Documento Padrão</label>
-          <input id="doc-number" type="text" value={currentSettings?.docNumber || ''} onChange={(e) => handleInputChange('docNumber', e.target.value)} className="mt-1 block w-full px-3 py-2 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-md shadow-sm" />
-      </div>
-      <div>
-          <label htmlFor="revision" className="block text-sm font-medium text-slate-600 dark:text-slate-300">Revisão Padrão</label>
-          <input id="revision" type="text" value={currentSettings?.revision || ''} onChange={(e) => handleInputChange('revision', e.target.value)} className="mt-1 block w-full px-3 py-2 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-md shadow-sm" />
-      </div>
-      <div>
-          <label htmlFor="property-info" className="block text-sm font-medium text-slate-600 dark:text-slate-300">Informação de Propriedade (Rodapé)</label>
-          <textarea id="property-info" value={currentSettings?.propertyInfo || ''} onChange={(e) => handleInputChange('propertyInfo', e.target.value)} rows={3} className="mt-1 block w-full px-3 py-2 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-md shadow-sm resize-y" />
+          <div className="space-y-4">
+              <div>
+                  <label htmlFor="doc-title" className="block text-sm font-medium text-slate-600 dark:text-slate-300">Título Padrão do Documento</label>
+                  <input id="doc-title" type="text" value={currentSettings?.documentSettings?.[activeDocType]?.title || ''} onChange={(e) => handleInputChange('title', e.target.value)} className="mt-1 block w-full px-3 py-2 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-md shadow-sm" />
+              </div>
+              <div>
+                  <label htmlFor="doc-number" className="block text-sm font-medium text-slate-600 dark:text-slate-300">Nº do Documento Padrão</label>
+                  <input id="doc-number" type="text" value={currentSettings?.documentSettings?.[activeDocType]?.docNumber || ''} onChange={(e) => handleInputChange('docNumber', e.target.value)} className="mt-1 block w-full px-3 py-2 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-md shadow-sm" />
+              </div>
+              <div>
+                  <label htmlFor="revision" className="block text-sm font-medium text-slate-600 dark:text-slate-300">Revisão Padrão</label>
+                  <input id="revision" type="text" value={currentSettings?.documentSettings?.[activeDocType]?.revision || ''} onChange={(e) => handleInputChange('revision', e.target.value)} className="mt-1 block w-full px-3 py-2 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-md shadow-sm" />
+              </div>
+              <div>
+                  <label htmlFor="property-info" className="block text-sm font-medium text-slate-600 dark:text-slate-300">Informação de Propriedade (Rodapé)</label>
+                  <textarea id="property-info" value={currentSettings?.documentSettings?.[activeDocType]?.propertyInfo || ''} onChange={(e) => handleInputChange('propertyInfo', e.target.value)} rows={3} className="mt-1 block w-full px-3 py-2 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-md shadow-sm resize-y" />
+              </div>
+          </div>
       </div>
 
       <div className="flex justify-end pt-4 border-t dark:border-slate-700">

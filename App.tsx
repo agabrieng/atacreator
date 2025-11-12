@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useEffect, useMemo } from 'react';
-import type { AtaData, AdminSettings, Participant, PautaItem, Empreendimento, Webhook, Projetista, Task } from './types';
+import type { AtaData, AdminSettings, Participant, PautaItem, Empreendimento, Webhook, Projetista, Task, DocumentSettings } from './types';
 import { generateAtaData } from './services/geminiService';
 import { 
     saveAtaToFirebase, 
@@ -34,18 +34,30 @@ import ProjectControlView from './components/ProjectControlView';
 import ProjectDashboardView from './components/ProjectDashboardView';
 import GeneralDashboardView from './components/GeneralDashboardView';
 import ProjetistasPanel from './components/ProjetistasPanel';
+import OnePageReportView from './components/OnePageReportView';
 import { AlertTriangleIcon, EditIcon, CheckIcon, CopyIcon, UploadCloudIcon, DownloadCloudIcon, FilePdfIcon, CheckCircleIcon, XIcon, CalendarCheckIcon, SettingsIcon, SendIcon, BriefcaseIcon } from './components/icons';
 
 const DEFAULT_COMPANY_NAME = "Minha Empresa";
 const DEFAULT_SETTINGS: AdminSettings = {
     companyName: DEFAULT_COMPANY_NAME,
     companyLogo: null,
-    docNumber: 'FM-GCO-RM2-002',
-    revision: '00',
-    propertyInfo: 'AS INFORMAÇÕES DESTE DOCUMENTO SÃO DE PROPRIEDADE DA SUA EMPRESA, SENDO PROIBIDA A UTILIZAÇÃO FORA DA SUA FINALIDADE.',
+    documentSettings: {
+        ata: {
+            title: 'ATA DE REUNIÃO',
+            docNumber: 'FM-GCO-RM2-002',
+            revision: '00',
+            propertyInfo: 'AS INFORMAÇÕES DESTE DOCUMENTO SÃO DE PROPRIEDADE DA SUA EMPRESA, SENDO PROIBIDA A UTILIZAÇÃO FORA DA SUA FINALIDADE.',
+        },
+        onepage: {
+            title: 'RELATÓRIO GERENCIAL ONEPAGE',
+            docNumber: 'FM-GCO-OPR-001',
+            revision: '00',
+            propertyInfo: 'AS INFORMAÇÕES DESTE DOCUMENTO SÃO DE PROPRIEDADE DA SUA EMPRESA, SENDO PROIBIDA A UTILIZAÇÃO FORA DA SUA FINALIDADE.',
+        }
+    }
 };
 
-type View = 'generalDashboard' | 'ataDashboard' | 'ataCreator' | 'ataRepository' | 'deadlinePanel' | 'settings' | 'projectControl' | 'projectDashboard';
+type View = 'generalDashboard' | 'ataDashboard' | 'ataCreator' | 'ataRepository' | 'deadlinePanel' | 'settings' | 'projectControl' | 'projectDashboard' | 'onePageReport';
 export type ItemToHighlight = { type: 'task' | 'project'; id: string } | null;
 
 
@@ -274,14 +286,16 @@ const AtaCreatorView: React.FC<{
               prazo: item.prazo, // Assign the common deadline to each responsible
           }))
       }));
+      
+      const { ata: ataSettings } = adminSettings.documentSettings;
 
       const finalAta: AtaData = {
         logoUrl: adminSettings.companyLogo,
         empreendimento,
         area,
         titulo,
-        numeroDocumento: adminSettings.docNumber,
-        revisao: adminSettings.revision,
+        numeroDocumento: ataSettings.docNumber,
+        revisao: ataSettings.revision,
         contrato,
         assunto,
         local,
@@ -290,7 +304,7 @@ const AtaCreatorView: React.FC<{
         participantes: updatedParticipants,
         observacoes: generatedPart.observacoes,
         pauta: finalPauta,
-        informacaoPropriedade: adminSettings.propertyInfo,
+        informacaoPropriedade: ataSettings.propertyInfo,
       };
 
       setAta(finalAta);
@@ -718,28 +732,53 @@ const App: React.FC = () => {
 
 
   useEffect(() => {
-    // Load company profiles from localStorage
     try {
-      const savedProfilesStr = localStorage.getItem('ata-company-profiles');
-      let profiles: Record<string, AdminSettings> = {};
-      if (savedProfilesStr) {
-        profiles = JSON.parse(savedProfilesStr);
-      }
-      if (Object.keys(profiles).length === 0) {
-        profiles[DEFAULT_COMPANY_NAME] = DEFAULT_SETTINGS;
-      }
-      setCompanyProfiles(profiles);
+        const savedProfilesStr = localStorage.getItem('ata-company-profiles');
+        let profiles: Record<string, AdminSettings> = {};
 
-      const savedCurrentCompany = localStorage.getItem('ata-current-company-name');
-      if (savedCurrentCompany && profiles[savedCurrentCompany]) {
-        setCurrentCompanyName(savedCurrentCompany);
-      } else {
-        setCurrentCompanyName(Object.keys(profiles)[0]);
-      }
+        if (savedProfilesStr) {
+            const loadedProfiles = JSON.parse(savedProfilesStr);
+            // Migration logic for old settings format
+            for (const companyName in loadedProfiles) {
+                const profile = loadedProfiles[companyName];
+                // Check if it's the old format (flat structure with docNumber)
+                if (profile.docNumber && !profile.documentSettings) {
+                    profiles[companyName] = {
+                        companyName: profile.companyName,
+                        companyLogo: profile.companyLogo,
+                        documentSettings: {
+                            ata: {
+                                title: 'ATA DE REUNIÃO', // Add default title during migration
+                                docNumber: profile.docNumber,
+                                revision: profile.revision,
+                                propertyInfo: profile.propertyInfo,
+                            },
+                            // Add default onepage settings during migration
+                            onepage: DEFAULT_SETTINGS.documentSettings.onepage,
+                        }
+                    };
+                } else {
+                    // It's the new format or an empty profile, use as is
+                    profiles[companyName] = profile;
+                }
+            }
+        }
+
+        if (Object.keys(profiles).length === 0) {
+            profiles[DEFAULT_COMPANY_NAME] = DEFAULT_SETTINGS;
+        }
+        setCompanyProfiles(profiles);
+
+        const savedCurrentCompany = localStorage.getItem('ata-current-company-name');
+        if (savedCurrentCompany && profiles[savedCurrentCompany]) {
+            setCurrentCompanyName(savedCurrentCompany);
+        } else {
+            setCurrentCompanyName(Object.keys(profiles)[0]);
+        }
     } catch (e) {
-      console.error("Failed to load settings from localStorage", e);
-      setCompanyProfiles({ [DEFAULT_COMPANY_NAME]: DEFAULT_SETTINGS });
-      setCurrentCompanyName(DEFAULT_COMPANY_NAME);
+        console.error("Failed to load or migrate settings from localStorage", e);
+        setCompanyProfiles({ [DEFAULT_COMPANY_NAME]: DEFAULT_SETTINGS });
+        setCurrentCompanyName(DEFAULT_COMPANY_NAME);
     }
     
     const fetchData = async () => {
@@ -921,6 +960,7 @@ const App: React.FC = () => {
       <div className={`flex-1 w-full transition-all duration-300 ease-in-out ${isSidebarCollapsed ? 'pl-20' : 'pl-64'}`}>
         {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
         {currentView === 'generalDashboard' && <GeneralDashboardView onNavigateToAta={(ata) => handleNavigateToAta(ata, 'view')} onHighlightItem={handleHighlightItem} />}
+        {currentView === 'onePageReport' && <OnePageReportView adminSettings={adminSettings} webhooks={webhooks} setToast={setToast} empreendimentos={empreendimentos} />}
         {currentView === 'ataDashboard' && <Dashboard />}
         {currentView === 'ataCreator' && <AtaCreatorView initialAta={ataToView} onAtaViewed={handleAtaViewed} companyProfiles={companyProfiles} currentCompanyName={currentCompanyName} setToast={setToast} empreendimentos={empreendimentos} initialMode={ataInitialMode} />}
         {currentView === 'ataRepository' && <AtaRepositoryView onNavigateToAta={(ata) => handleNavigateToAta(ata, 'edit')} />}

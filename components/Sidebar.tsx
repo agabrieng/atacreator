@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import { LayoutDashboardIcon, GridIcon, FileTextIcon, ChevronLeftIcon, ChevronRightIcon, CalendarCheckIcon, SettingsIcon, ArchiveIcon, SparklesIcon, BriefcaseIcon, ClipboardListIcon, TrendingUpIcon } from './icons';
 
-type View = 'generalDashboard' | 'ataDashboard' | 'ataCreator' | 'deadlinePanel' | 'settings' | 'ataRepository' | 'projectControl' | 'projectDashboard';
+type View = 'generalDashboard' | 'ataDashboard' | 'ataCreator' | 'deadlinePanel' | 'settings' | 'ataRepository' | 'projectControl' | 'projectDashboard' | 'onePageReport';
 
 interface SidebarProps {
   currentView: View;
@@ -60,6 +60,14 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, setCurrentView, isCollap
             label="Painel Geral"
             isActive={currentView === 'generalDashboard'}
             onClick={() => setCurrentView('generalDashboard')}
+            isCollapsed={isCollapsed}
+        />
+
+        <NavLink
+            icon={TrendingUpIcon}
+            label="Relatório OnePage"
+            isActive={currentView === 'onePageReport'}
+            onClick={() => setCurrentView('onePageReport')}
             isCollapsed={isCollapsed}
         />
 

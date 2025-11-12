@@ -1,9 +1,17 @@
-export interface AdminSettings {
-  companyName: string;
-  companyLogo: string | null; // base64 string
+export interface DocumentSettings {
+  title: string;
   docNumber: string;
   revision: string;
   propertyInfo: string;
+}
+
+export interface AdminSettings {
+  companyName: string;
+  companyLogo: string | null; // base64 string
+  documentSettings: {
+    ata: DocumentSettings;
+    onepage: DocumentSettings;
+  };
 }
 
 export interface Participant {
@@ -147,4 +155,17 @@ export interface IbgeState {
 export interface IbgeCity {
   id: number;
   nome: string;
+}
+
+// --- Type for One Page Report ---
+export interface OnePageReportData {
+  periodo: string;
+  empreendimento?: string;
+  sumarioExecutivo: string;
+  principaisDecisoes: string[];
+  acoesCriticas: { acao: string; responsavel: string; prazo: string }[];
+  projetosConcluidos: { nome: string; dataEntrega: string }[];
+  projetosEmRisco: { nome:string; motivo: string; prazo: string }[];
+  analiseRiscos: string[];
+  recomendacoes: string[];
 }

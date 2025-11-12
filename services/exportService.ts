@@ -43,7 +43,7 @@ export const exportToPdf = async (ata: AtaData): Promise<void> => {
         // --- Header ---
         if (ata.logoUrl) {
           try {
-            doc.addImage(ata.logoUrl, 'PNG', margin, 10, 40, 15);
+            doc.addImage(ata.logoUrl, margin, 10, 40, 15);
           } catch (e) { console.error("Error adding logo to PDF", e); }
         }
         
@@ -184,8 +184,16 @@ export const exportToPdf = async (ata: AtaData): Promise<void> => {
     const totalPages = doc.internal.getNumberOfPages();
     for (let i = 1; i <= totalPages; i++) {
         doc.setPage(i);
-        doc.setFontSize(8);
-        doc.text(ata.informacaoPropriedade, page_width / 2, doc.internal.pageSize.getHeight() - 7, { align: 'center' });
+        doc.setFontSize(5);
+        doc.text(
+            ata.informacaoPropriedade,
+            page_width / 2,
+            doc.internal.pageSize.getHeight() - 5,
+            { 
+                align: 'center',
+                maxWidth: page_width - margin * 2
+            }
+        );
     }
 
     // Replace the placeholder with the total page count.
