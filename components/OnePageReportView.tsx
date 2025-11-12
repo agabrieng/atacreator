@@ -138,6 +138,20 @@ const ReportDisplay: React.FC<{ report: OnePageReportData }> = ({ report }) => (
             <p className="text-slate-600 dark:text-slate-300 text-sm leading-relaxed">{report.sumarioExecutivo}</p>
         </section>
 
+        {report.porDentroDasReunioes && report.porDentroDasReunioes.length > 0 && (
+            <section>
+                <h3 className="text-lg font-bold mb-3">Por dentro das reuniões</h3>
+                <div className="space-y-4">
+                    {report.porDentroDasReunioes.map((reuniao, i) => (
+                        <div key={i} className="p-4 bg-slate-50 dark:bg-slate-700/50 rounded-lg border border-slate-200 dark:border-slate-700">
+                            <p className="font-semibold text-sm text-slate-800 dark:text-slate-200">{reuniao.data} - {reuniao.titulo}</p>
+                            <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">{reuniao.resumo}</p>
+                        </div>
+                    ))}
+                </div>
+            </section>
+        )}
+
         <section>
             <h3 className="text-lg font-bold mb-2">Principais Decisões</h3>
             <ul className="list-disc list-inside space-y-1 text-sm text-slate-600 dark:text-slate-300">

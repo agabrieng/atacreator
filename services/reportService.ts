@@ -22,75 +22,63 @@ export const exportOnePageToPdf = async (reportData: OnePageReportData, adminSet
 
     const totalPagesPlaceholder = '{totalPages}';
     const page_width = doc.internal.pageSize.getWidth();
+    const page_height = doc.internal.pageSize.getHeight();
     const margin = 15;
-    const headerHeight = 50;
-    const footerMargin = 10; // Space reserved at the bottom for the footer text
+    const headerHeight = 40;
+    const footerMargin = 10;
 
     const drawPageTemplate = (data: any) => {
         const pageNum = data.pageNumber;
-        // Header
-        if (companyLogo) {
-          try {
-            doc.addImage(companyLogo, margin - 5, 10, 40, 15);
-          } catch (e) { console.error("Error adding logo to PDF", e); }
-        }
         
+        // Header Table
         (doc as any).autoTable({
             head: [
-                [{ content: docSettings.title.toUpperCase(), rowSpan: 3, styles: { halign: 'center', valign: 'middle', fontSize: 14, fontStyle: 'bold' } }, {content: `N°: ${docSettings.docNumber}`, styles: {halign: 'left'}}, {content: `Rev. ${docSettings.revision}`, styles: {halign: 'left'}}],
+                [{ content: docSettings.title.toUpperCase(), rowSpan: 2, styles: { halign: 'center', valign: 'middle', fontSize: 14, fontStyle: 'bold' } }, {content: `N°: ${docSettings.docNumber}`, styles: {halign: 'left'}}, {content: `Rev. ${docSettings.revision}`, styles: {halign: 'left'}}],
                 [{ content: `FOLHA: ${pageNum} de ${totalPagesPlaceholder}`, colSpan: 2, styles: {halign: 'left'} }],
-                [{content: '', colSpan: 2, styles: {minCellHeight: 2}}] 
             ],
             startY: 10,
-            margin: { left: margin + 40 },
+            margin: { left: margin + 45 },
             theme: 'grid',
             styles: { fontSize: 8, cellPadding: 1 },
             headStyles: {fillColor: [255, 255, 255], textColor: 0, lineWidth: 0.1, lineColor: [150, 150, 150]},
-            bodyStyles: {fillColor: [255, 255, 255], textColor: 0, lineWidth: 0.1, lineColor: [150, 150, 150]},
         });
+        
+        // Logo
+        if (companyLogo) {
+          try {
+            doc.addImage(companyLogo, margin, 12, 40, 15);
+          } catch (e) { console.error("Error adding logo to PDF", e); }
+        }
 
         // Footer
         doc.setFontSize(5);
         doc.text(
             docSettings.propertyInfo,
             page_width / 2,
-            doc.internal.pageSize.getHeight() - 5,
-            { 
-                align: 'center',
-                maxWidth: page_width - margin * 2
-            }
+            page_height - 5,
+            { align: 'center', maxWidth: page_width - margin * 2 }
         );
     };
 
-    let lastY = headerHeight;
+    let lastY = 35; // Initial start Y after header area
 
-    const addSection = (title: string, estimatedContentHeight: number, contentGenerator: () => void) => {
-        const titleHeight = 8;
-        const pageHeight = doc.internal.pageSize.getHeight();
-        const availablePageHeight = pageHeight - headerHeight - footerMargin;
-        const remainingSpaceOnPage = pageHeight - lastY - footerMargin;
-        
-        const requiredHeight = titleHeight + estimatedContentHeight;
-
-        // If the section is small enough for a single page but doesn't fit in the remaining space, move to a new page.
-        if (requiredHeight < availablePageHeight && requiredHeight > remainingSpaceOnPage) {
+    const checkPageBreak = (neededHeight: number) => {
+        if (lastY + neededHeight > page_height - footerMargin) {
             doc.addPage();
             lastY = headerHeight;
         }
-        // Also handle the edge case where only the title would fit, orphaning it.
-        else if (lastY + titleHeight > pageHeight - footerMargin - 15) { // 15mm buffer for at least one row of content
-            doc.addPage();
-            lastY = headerHeight;
-        }
+    };
 
+    const addSectionTitle = (title: string) => {
+        checkPageBreak(15); // Check space for title + a bit of content
         doc.setFontSize(14);
         doc.setFont('helvetica', 'bold');
         doc.text(title, margin, lastY);
-        lastY += titleHeight;
-        contentGenerator();
+        lastY += 8;
     };
     
-    // Main Report Title
+    // --- Main Report Title and Header Info ---
+    checkPageBreak(30);
     doc.setFontSize(18);
     doc.setFont('helvetica', 'bold');
     doc.text('Relatório Gerencial OnePage', page_width / 2, lastY, { align: 'center' });
@@ -108,81 +96,83 @@ export const exportOnePageToPdf = async (reportData: OnePageReportData, adminSet
         doc.text('Empreendimento:', margin, lastY);
         doc.setFont('helvetica', 'normal');
         const empreendimentoText = doc.splitTextToSize(reportData.empreendimento, page_width - margin * 2 - 32);
+        checkPageBreak(empreendimentoText.length * 4);
         doc.text(empreendimentoText, margin + 32, lastY);
-        lastY += (empreendimentoText.length * 4); // Line height for 10pt font is ~4mm
+        lastY += (empreendimentoText.length * 4);
     }
-    lastY += 6; // Space after header info
+    lastY += 6;
     
+    const autoTableOptions = {
+        didDrawPage: drawPageTemplate,
+        margin: { left: margin, right: margin, top: headerHeight },
+    };
+
     // --- Sumário Executivo ---
-    doc.setFontSize(10);
-    const summaryLines = doc.splitTextToSize(reportData.sumarioExecutivo, page_width - margin * 2);
-    const summaryHeight = summaryLines.length * 5;
-    addSection('Sumário Executivo', summaryHeight, () => {
+    addSectionTitle('Sumário Executivo');
+    (doc as any).autoTable({ ...autoTableOptions, startY: lastY, body: [[reportData.sumarioExecutivo]], theme: 'plain', styles: { fontSize: 10 } });
+    lastY = (doc as any).autoTable.previous.finalY + 8;
+
+    // --- Por dentro das reuniões ---
+    if (reportData.porDentroDasReunioes?.length > 0) {
+        addSectionTitle('Por dentro das reuniões');
         (doc as any).autoTable({
+            ...autoTableOptions,
             startY: lastY,
-            body: [[{ content: reportData.sumarioExecutivo, styles: { cellPadding: {top: 0, left: 0, right: 0, bottom: 2} } }]],
+            body: reportData.porDentroDasReunioes.flatMap(reuniao => [
+                [{ content: `${reuniao.data} - ${reuniao.titulo}`, styles: { fontStyle: 'bold', cellPadding: { top: 3, bottom: 1 } } }],
+                [{ content: reuniao.resumo, styles: { cellPadding: { top: 1, bottom: 5 } } }],
+            ]),
             theme: 'plain',
             styles: { fontSize: 10 },
-            didDrawPage: drawPageTemplate,
-            margin: { left: margin, right: margin },
         });
         lastY = (doc as any).autoTable.previous.finalY + 8;
-    });
-
-    if (reportData.principaisDecisoes.length > 0) {
-        const estimatedHeight = reportData.principaisDecisoes.length * 7; // 7mm per list item
-        addSection('Principais Decisões', estimatedHeight, () => {
-             (doc as any).autoTable({ startY: lastY, body: reportData.principaisDecisoes.map(d => [{content: `• ${d}`, styles: { cellPadding: 2 }}]), theme: 'plain', styles: { fontSize: 10 }, didDrawPage: drawPageTemplate, margin: { left: margin, right: margin } });
-             lastY = (doc as any).autoTable.previous.finalY + 8;
-        });
     }
 
-    if (reportData.acoesCriticas.length > 0) {
-        const estimatedHeight = (1 + reportData.acoesCriticas.length) * 10; // 10mm per row to be safe with wrapping
-        addSection('Ações Críticas', estimatedHeight, () => {
-            (doc as any).autoTable({ startY: lastY, head: [['Ação', 'Responsável', 'Prazo']], body: reportData.acoesCriticas.map(a => [a.acao, a.responsavel, a.prazo]), theme: 'grid', headStyles: { fillColor: [41, 128, 185] }, didDrawPage: drawPageTemplate, margin: { left: margin, right: margin } });
-            lastY = (doc as any).autoTable.previous.finalY + 10;
-        });
+    // --- Principais Decisões ---
+    if (reportData.principaisDecisoes?.length > 0) {
+        addSectionTitle('Principais Decisões');
+        (doc as any).autoTable({ ...autoTableOptions, startY: lastY, body: reportData.principaisDecisoes.map(d => [`• ${d}`]), theme: 'plain', styles: { fontSize: 10, cellPadding: 2 } });
+        lastY = (doc as any).autoTable.previous.finalY + 8;
     }
 
-    if (reportData.projetosConcluidos.length > 0) {
-        const estimatedHeight = (1 + reportData.projetosConcluidos.length) * 8; // 8mm per row, less wrapping
-        addSection('Projetos Concluídos', estimatedHeight, () => {
-            (doc as any).autoTable({ startY: lastY, head: [['Projeto', 'Data de Entrega']], body: reportData.projetosConcluidos.map(p => [p.nome, p.dataEntrega]), headStyles: { fillColor: [39, 174, 96] }, didDrawPage: drawPageTemplate, margin: { left: margin, right: margin } });
-            lastY = (doc as any).autoTable.previous.finalY + 10;
-        });
+    // --- Ações Críticas ---
+    if (reportData.acoesCriticas?.length > 0) {
+        addSectionTitle('Ações Críticas');
+        (doc as any).autoTable({ ...autoTableOptions, startY: lastY, head: [['Ação', 'Responsável', 'Prazo']], body: reportData.acoesCriticas.map(a => [a.acao, a.responsavel, a.prazo]), theme: 'grid', headStyles: { fillColor: [41, 128, 185] } });
+        lastY = (doc as any).autoTable.previous.finalY + 10;
+    }
+
+    // --- Projetos Concluídos ---
+    if (reportData.projetosConcluidos?.length > 0) {
+        addSectionTitle('Projetos Concluídos');
+        (doc as any).autoTable({ ...autoTableOptions, startY: lastY, head: [['Projeto', 'Data de Entrega']], body: reportData.projetosConcluidos.map(p => [p.nome, p.dataEntrega]), headStyles: { fillColor: [39, 174, 96] } });
+        lastY = (doc as any).autoTable.previous.finalY + 10;
+    }
+
+    // --- Projetos em Risco ---
+    if (reportData.projetosEmRisco?.length > 0) {
+        addSectionTitle('Projetos em Risco');
+        (doc as any).autoTable({ ...autoTableOptions, startY: lastY, head: [['Projeto', 'Prazo', 'Motivo']], body: reportData.projetosEmRisco.map(p => [p.nome, p.prazo, p.motivo]), headStyles: { fillColor: [231, 76, 60] } });
+        lastY = (doc as any).autoTable.previous.finalY + 10;
+    }
+
+    // --- Análise de Riscos ---
+    if (reportData.analiseRiscos?.length > 0) {
+        addSectionTitle('Análise de Riscos e Impedimentos');
+        (doc as any).autoTable({ ...autoTableOptions, startY: lastY, body: reportData.analiseRiscos.map(d => [`• ${d}`]), theme: 'plain', styles: { fontSize: 10, cellPadding: 2 } });
+        lastY = (doc as any).autoTable.previous.finalY + 8;
     }
     
-    if (reportData.projetosEmRisco.length > 0) {
-        const estimatedHeight = (1 + reportData.projetosEmRisco.length) * 12; // 12mm per row, allows for significant wrapping
-        addSection('Projetos em Risco', estimatedHeight, () => {
-            (doc as any).autoTable({ startY: lastY, head: [['Projeto', 'Prazo', 'Motivo']], body: reportData.projetosEmRisco.map(p => [p.nome, p.prazo, p.motivo]), headStyles: { fillColor: [231, 76, 60] }, didDrawPage: drawPageTemplate, margin: { left: margin, right: margin } });
-            lastY = (doc as any).autoTable.previous.finalY + 10;
-        });
+    // --- Recomendações ---
+    if (reportData.recomendacoes?.length > 0) {
+        addSectionTitle('Recomendações');
+        (doc as any).autoTable({ ...autoTableOptions, startY: lastY, body: reportData.recomendacoes.map(d => [`• ${d}`]), theme: 'plain', styles: { fontSize: 10, cellPadding: 2 } });
+        lastY = (doc as any).autoTable.previous.finalY + 8;
     }
 
-    if (reportData.analiseRiscos.length > 0) {
-        const estimatedHeight = reportData.analiseRiscos.length * 7;
-        addSection('Análise de Riscos e Impedimentos', estimatedHeight, () => {
-            (doc as any).autoTable({ startY: lastY, body: reportData.analiseRiscos.map(d => [{content: `• ${d}`, styles: { cellPadding: 2 }}]), theme: 'plain', styles: { fontSize: 10 }, didDrawPage: drawPageTemplate, margin: { left: margin, right: margin } });
-            lastY = (doc as any).autoTable.previous.finalY + 8;
-        });
-    }
-
-    if (reportData.recomendacoes.length > 0) {
-        const estimatedHeight = reportData.recomendacoes.length * 7;
-        addSection('Recomendações', estimatedHeight, () => {
-            (doc as any).autoTable({ startY: lastY, body: reportData.recomendacoes.map(d => [{content: `• ${d}`, styles: { cellPadding: 2 }}]), theme: 'plain', styles: { fontSize: 10 }, didDrawPage: drawPageTemplate, margin: { left: margin, right: margin } });
-            lastY = (doc as any).autoTable.previous.finalY + 8;
-        });
-    }
-
-
-    // Call the template on the first page
-    drawPageTemplate({ pageNumber: 1 });
-
+    // --- Finalize Pages ---
     const totalPages = doc.internal.getNumberOfPages();
-    for (let i = 2; i <= totalPages; i++) {
+    for (let i = 1; i <= totalPages; i++) {
         doc.setPage(i);
         drawPageTemplate({ pageNumber: i });
     }
@@ -191,7 +181,31 @@ export const exportOnePageToPdf = async (reportData: OnePageReportData, adminSet
       (doc as any).putTotalPages(totalPagesPlaceholder);
     }
     
-    doc.save('Relatorio_OnePage.pdf');
+    // --- Generate Dynamic Filename ---
+    const now = new Date();
+    const formattedDateTime = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}_${String(now.getHours()).padStart(2, '0')}h${String(now.getMinutes()).padStart(2, '0')}`;
+    
+    let periodForFilename = reportData.periodo.replace(/[^0-9a-zA-Z]+/g, '_');
+    const dates = reportData.periodo.match(/\d{2}\/\d{2}\/\d{4}/g);
+    if (dates && dates.length > 0) {
+        periodForFilename = dates.join('_a_').replace(/\//g, '-');
+    }
+
+    let empreendimentoForFilename = '';
+    if (reportData.empreendimento) {
+        const slug = reportData.empreendimento
+            .toLowerCase()
+            .replace(/\{|\}/g, '')
+            .replace(/[^a-z0-9\s-]/g, '')
+            .trim()
+            .replace(/\s+/g, '-')
+            .replace(/-+/g, '-');
+        empreendimentoForFilename = `_${slug.substring(0, 15)}`;
+    }
+
+    const filename = `${formattedDateTime}_Relatorio_OnePage_semana_${periodForFilename}${empreendimentoForFilename}.pdf`;
+
+    doc.save(filename);
 };
 
 
@@ -227,6 +241,17 @@ export const generateOnePageHtmlForEmail = (reportData: OnePageReportData, admin
             
             ${section('Sumário Executivo', `<p style="line-height: 1.6; font-size: 14px; color: #34495e;">${reportData.sumarioExecutivo}</p>`)}
             
+            ${reportData.porDentroDasReunioes && reportData.porDentroDasReunioes.length > 0 ? 
+                section('Por dentro das reuniões', 
+                    reportData.porDentroDasReunioes.map(reuniao => `
+                        <div style="margin-bottom: 12px; padding: 10px; background-color: #ecf0f1; border-radius: 4px;">
+                            <p style="margin: 0 0 5px 0; font-size: 13px; font-weight: bold; color: #2c3e50;">${reuniao.data} - ${reuniao.titulo}</p>
+                            <p style="margin: 0; line-height: 1.5; font-size: 13px; color: #34495e;">${reuniao.resumo}</p>
+                        </div>
+                    `).join('')
+                ) : ''
+            }
+
             ${reportData.principaisDecisoes.length > 0 ? section('Principais Decisões', `<ul style="padding-left: 20px; color: #34495e; font-size: 14px;">${listItems(reportData.principaisDecisoes)}</ul>`) : ''}
 
             ${reportData.acoesCriticas.length > 0 ? section('Ações Críticas', table(['Ação', 'Responsável', 'Prazo'], reportData.acoesCriticas.map(a => [a.acao, a.responsavel, a.prazo]), '#2980b9')) : ''}
@@ -272,6 +297,21 @@ export const generateOnePageAdaptiveCard = (reportData: OnePageReportData, admin
         { type: 'TextBlock', text: reportData.periodo, isSubtle: true, spacing: 'none', wrap: true },
         ...section('Sumário Executivo', [{ type: 'TextBlock', text: reportData.sumarioExecutivo, wrap: true }]),
     ];
+
+    if (reportData.porDentroDasReunioes && reportData.porDentroDasReunioes.length > 0) {
+        const meetingSummaries = reportData.porDentroDasReunioes.map(reuniao => (
+            {
+                type: 'Container',
+                style: 'emphasis',
+                items: [
+                    { type: 'TextBlock', text: `${reuniao.data} - ${reuniao.titulo}`, weight: 'bolder', wrap: true },
+                    { type: 'TextBlock', text: reuniao.resumo, wrap: true, spacing: 'small' }
+                ],
+                separator: true
+            }
+        ));
+        body.push(...section('Por dentro das reuniões', meetingSummaries));
+    }
 
     if (reportData.principaisDecisoes.length > 0) {
         body.push(...section('Principais Decisões', list(reportData.principaisDecisoes)));
