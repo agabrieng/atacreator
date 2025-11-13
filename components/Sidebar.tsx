@@ -1,9 +1,9 @@
 
 
 import React, { useState } from 'react';
-import { LayoutDashboardIcon, GridIcon, FileTextIcon, ChevronLeftIcon, ChevronRightIcon, CalendarCheckIcon, SettingsIcon, ArchiveIcon, SparklesIcon, BriefcaseIcon, ClipboardListIcon, TrendingUpIcon } from './icons';
+import { LayoutDashboardIcon, GridIcon, FileTextIcon, ChevronLeftIcon, ChevronRightIcon, CalendarCheckIcon, SettingsIcon, ArchiveIcon, SparklesIcon, BriefcaseIcon, ClipboardListIcon, TrendingUpIcon, BrainCircuitIcon } from './icons';
 
-type View = 'generalDashboard' | 'ataDashboard' | 'ataCreator' | 'deadlinePanel' | 'settings' | 'ataRepository' | 'projectControl' | 'projectDashboard' | 'onePageReport';
+type View = 'generalDashboard' | 'ataDashboard' | 'ataCreator' | 'deadlinePanel' | 'settings' | 'ataRepository' | 'projectControl' | 'projectDashboard' | 'onePageReport' | 'aiAssistant';
 
 interface SidebarProps {
   currentView: View;
@@ -68,6 +68,14 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, setCurrentView, isCollap
             label="Relatório OnePage"
             isActive={currentView === 'onePageReport'}
             onClick={() => setCurrentView('onePageReport')}
+            isCollapsed={isCollapsed}
+        />
+        
+        <NavLink
+            icon={BrainCircuitIcon}
+            label="Assistente IA"
+            isActive={currentView === 'aiAssistant'}
+            onClick={() => setCurrentView('aiAssistant')}
             isCollapsed={isCollapsed}
         />
 

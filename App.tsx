@@ -35,6 +35,7 @@ import ProjectDashboardView from './components/ProjectDashboardView';
 import GeneralDashboardView from './components/GeneralDashboardView';
 import ProjetistasPanel from './components/ProjetistasPanel';
 import OnePageReportView from './components/OnePageReportView';
+import AiAssistantView from './components/AiAssistantView';
 import { AlertTriangleIcon, EditIcon, CheckIcon, CopyIcon, UploadCloudIcon, DownloadCloudIcon, FilePdfIcon, CheckCircleIcon, XIcon, CalendarCheckIcon, SettingsIcon, SendIcon, BriefcaseIcon } from './components/icons';
 
 const DEFAULT_COMPANY_NAME = "Minha Empresa";
@@ -57,7 +58,7 @@ const DEFAULT_SETTINGS: AdminSettings = {
     }
 };
 
-type View = 'generalDashboard' | 'ataDashboard' | 'ataCreator' | 'ataRepository' | 'deadlinePanel' | 'settings' | 'projectControl' | 'projectDashboard' | 'onePageReport';
+type View = 'generalDashboard' | 'ataDashboard' | 'ataCreator' | 'ataRepository' | 'deadlinePanel' | 'settings' | 'projectControl' | 'projectDashboard' | 'onePageReport' | 'aiAssistant';
 export type ItemToHighlight = { type: 'task' | 'project'; id: string } | null;
 
 
@@ -961,6 +962,7 @@ const App: React.FC = () => {
         {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
         {currentView === 'generalDashboard' && <GeneralDashboardView onNavigateToAta={(ata) => handleNavigateToAta(ata, 'view')} onHighlightItem={handleHighlightItem} />}
         {currentView === 'onePageReport' && <OnePageReportView adminSettings={adminSettings} webhooks={webhooks} setToast={setToast} empreendimentos={empreendimentos} />}
+        {currentView === 'aiAssistant' && <AiAssistantView adminSettings={adminSettings} webhooks={webhooks} />}
         {currentView === 'ataDashboard' && <Dashboard />}
         {currentView === 'ataCreator' && <AtaCreatorView initialAta={ataToView} onAtaViewed={handleAtaViewed} companyProfiles={companyProfiles} currentCompanyName={currentCompanyName} setToast={setToast} empreendimentos={empreendimentos} initialMode={ataInitialMode} />}
         {currentView === 'ataRepository' && <AtaRepositoryView onNavigateToAta={(ata) => handleNavigateToAta(ata, 'edit')} />}

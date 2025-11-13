@@ -220,3 +220,30 @@ export const ClipboardListIcon: React.FC<React.SVGProps<SVGSVGElement>> = (props
         <path d="M8 16h.01"></path>
     </svg>
 );
+
+export const BrainCircuitIcon: React.FC<React.SVGProps<SVGSVGElement>> = (props) => (
+    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+        <path d="M12 5a3 3 0 1 0-5.993.142"/>
+        <path d="M18 13a3 3 0 1 0-5.993.142"/>
+        <path d="M12 21a3 3 0 1 0-5.993-.142"/>
+        <path d="M6 13a3 3 0 1 0 .142-5.993"/>
+        <path d="M17.858 11.007A3 3 0 1 0 12 5"/>
+        <path d="M6.142 11.007A3 3 0 1 0 12 5"/>
+        <path d="m14.004 15.145.002-.002a3 3 0 1 0-4.01-4.002"/>
+        <path d="M12 13a3 3 0 1 0 5.993-.142"/>
+        <path d="m12 13-1.854 1.854"/>
+        <path d="M12 5a3 3 0 1 0 5.993.142"/>
+        <path d="M12 5a3 3 0 1 0-5.993.142"/>
+        <path d="M12 21a3 3 0 1 0 5.993-.142"/>
+    </svg>
+);
+
+export const Share2Icon: React.FC<React.SVGProps<SVGSVGElement>> = (props) => (
+    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+        <circle cx="18" cy="5" r="3"></circle>
+        <circle cx="6" cy="12" r="3"></circle>
+        <circle cx="18" cy="19" r="3"></circle>
+        <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line>
+        <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line>
+    </svg>
+);

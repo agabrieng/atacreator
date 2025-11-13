@@ -266,3 +266,76 @@ export const generateOnePageReport = async (atas: AtaData[], projetos: Projeto[]
         throw error;
     }
 };
+
+export const chatWithAiAssistant = async (question: string, contextData: { atas: AtaData[], projetos: Projeto[] }): Promise<string> => {
+    const API_KEY = process.env.API_KEY;
+    if (!API_KEY) throw new Error("API_KEY_MISSING");
+
+    const ai = new GoogleGenAI({ apiKey: API_KEY });
+
+    // Simplifica os dados de contexto para reduzir a contagem de tokens e evitar erros de limite.
+    const simplifiedContext = {
+        atas: contextData.atas.map(ata => ({
+            data: ata.data,
+            empreendimento: ata.empreendimento,
+            titulo: ata.titulo,
+            assunto: ata.assunto,
+            observacoes: ata.observacoes,
+            pauta: ata.pauta.map(p => ({
+                descricao: p.descricao,
+                responsaveis: p.responsaveis.map(r => r.responsavel).join(', '),
+                prazo: p.responsaveis.length > 0 ? p.responsaveis[0].prazo : null
+            }))
+        })),
+        projetos: contextData.projetos.map(p => ({
+            nome: p.name,
+            empreendimento: p.empreendimento,
+            status: p.status,
+            prazo: p.deadline,
+            dataEntrega: p.dataEntrega,
+            descricao: p.description
+        }))
+    };
+
+    const prompt = `
+    **PERSONA:** Você é o 'Assistente IA Claritas', um especialista em análise de atas de reunião e gerenciamento de projetos. Sua única fonte de conhecimento é o conjunto de dados em formato JSON fornecido abaixo.
+
+    **TAREFA:** Responda à pergunta do usuário baseando-se **exclusivamente** nas informações contidas nos arrays 'atas' e 'projetos'. Analise, correlacione e sintetize os dados para fornecer a resposta mais precisa e completa possível.
+
+    **REGRAS:**
+    1.  NÃO invente informações. Se a resposta não puder ser encontrada nos dados, afirme claramente que a informação não está disponível na sua base de conhecimento.
+    2.  Seja objetivo e direto. Use formatação Markdown (listas com \`*\`, negrito com \`**\`) para melhorar a clareza.
+    3.  Ao citar uma informação, se possível, mencione a origem (ex: "Na ata sobre 'Assunto X' do dia DD/MM/YYYY..." ou "No projeto 'Nome do Projeto'...").
+    4.  Responda em português do Brasil.
+
+    **BASE DE CONHECIMENTO (DADOS):**
+    \`\`\`json
+    ${JSON.stringify(simplifiedContext)}
+    \`\`\`
+
+    ---
+
+    **PERGUNTA DO USUÁRIO:**
+    ${question}
+    `;
+
+    try {
+        const response = await ai.models.generateContent({
+            model: GEMINI_MODEL,
+            contents: prompt,
+            config: {
+                temperature: 0.2,
+            }
+        });
+
+        return response.text;
+    } catch (error) {
+        console.error("Error calling Gemini API for AI Assistant:", error);
+        // Verifica erros específicos de limite de token. A mensagem de erro da API pode variar.
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        if (errorMessage.includes('request payload size') || errorMessage.includes('exceeds the maximum number of tokens')) {
+            throw new Error("A quantidade de dados (atas e projetos) é muito grande para ser processada, mesmo após a otimização. Tente fazer uma pergunta mais específica ou, futuramente, filtros serão implementados para reduzir o contexto.");
+        }
+        throw new Error("Ocorreu um erro ao comunicar com o assistente de IA.");
+    }
+};
