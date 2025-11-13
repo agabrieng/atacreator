@@ -962,7 +962,7 @@ const App: React.FC = () => {
         {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
         {currentView === 'generalDashboard' && <GeneralDashboardView onNavigateToAta={(ata) => handleNavigateToAta(ata, 'view')} onHighlightItem={handleHighlightItem} />}
         {currentView === 'onePageReport' && <OnePageReportView adminSettings={adminSettings} webhooks={webhooks} setToast={setToast} empreendimentos={empreendimentos} />}
-        {currentView === 'aiAssistant' && <AiAssistantView adminSettings={adminSettings} webhooks={webhooks} />}
+        {currentView === 'aiAssistant' && <AiAssistantView adminSettings={adminSettings} webhooks={webhooks} setToast={setToast} />}
         {currentView === 'ataDashboard' && <Dashboard />}
         {currentView === 'ataCreator' && <AtaCreatorView initialAta={ataToView} onAtaViewed={handleAtaViewed} companyProfiles={companyProfiles} currentCompanyName={currentCompanyName} setToast={setToast} empreendimentos={empreendimentos} initialMode={ataInitialMode} />}
         {currentView === 'ataRepository' && <AtaRepositoryView onNavigateToAta={(ata) => handleNavigateToAta(ata, 'edit')} />}

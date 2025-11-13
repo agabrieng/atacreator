@@ -170,3 +170,17 @@ export interface OnePageReportData {
   recomendacoes: string[];
   visaoGeralDasReunioes: string;
 }
+
+// --- Types for AI Assistant ---
+export interface Message {
+    id: number;
+    text: string;
+    sender: 'user' | 'ai';
+}
+
+export interface SavedConversation {
+    id: string;
+    name: string;
+    messages: Message[];
+    createdAt: string;
+}

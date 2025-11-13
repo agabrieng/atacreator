@@ -11,7 +11,7 @@ import {
     orderBy,
     where, 
 } from "firebase/firestore";
-import type { AtaData, Empreendimento, Webhook, Projetista, Projeto } from '../types';
+import type { AtaData, Empreendimento, Webhook, Projetista, Projeto, SavedConversation } from '../types';
 
 // As credenciais da conta de serviço não devem ser usadas no cliente.
 // O SDK da Web usa este objeto de configuração, que é seguro para expor.
@@ -45,6 +45,7 @@ const atasCollectionRef = collection(db, 'atas');
 const webhooksCollectionRef = collection(db, 'webhooks');
 const projetistasCollectionRef = collection(db, 'projetistas');
 const projetosCollectionRef = collection(db, 'projetos');
+const chatHistoryCollectionRef = collection(db, 'ai_chat_history');
 
 
 // --- Empreendimentos (Projetos) ---
@@ -254,5 +255,52 @@ export const deleteWebhook = async (id: string): Promise<void> => {
     await deleteDoc(webhookDoc);
   } catch (error) {
     throw handleFirebaseError(error, "excluir webhook");
+  }
+};
+
+// --- AI Chat History ---
+
+export const getChatHistory = async (): Promise<SavedConversation[]> => {
+  try {
+    const q = query(chatHistoryCollectionRef, orderBy('createdAt', 'desc'));
+    const querySnapshot = await getDocs(q);
+    return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as SavedConversation));
+  } catch (error) {
+    throw handleFirebaseError(error, "obter histórico do chat");
+  }
+};
+
+export const saveChatConversation = async (conversation: Omit<SavedConversation, 'id'> & { id?: string }): Promise<string> => {
+  try {
+    const { id, ...dataToSave } = conversation;
+    if (id) {
+      const convoDoc = doc(db, 'ai_chat_history', id);
+      await updateDoc(convoDoc, dataToSave);
+      return id;
+    } else {
+      const docRef = await addDoc(chatHistoryCollectionRef, dataToSave);
+      return docRef.id;
+    }
+  } catch (error) {
+    throw handleFirebaseError(error, "salvar conversa do chat");
+  }
+};
+
+export const updateChatConversationName = async (id: string, newName: string): Promise<void> => {
+    try {
+        const convoDoc = doc(db, 'ai_chat_history', id);
+        await updateDoc(convoDoc, { name: newName });
+    } catch (error) {
+        throw handleFirebaseError(error, "renomear conversa do chat");
+    }
+};
+
+export const deleteChatConversation = async (id: string): Promise<void> => {
+  try {
+    if (!id) throw new Error("O ID da conversa é necessário para a exclusão.");
+    const convoDoc = doc(db, 'ai_chat_history', id);
+    await deleteDoc(convoDoc);
+  } catch (error) {
+    throw handleFirebaseError(error, "excluir conversa do chat");
   }
 };
